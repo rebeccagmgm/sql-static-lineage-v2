@@ -8,6 +8,9 @@ import {
   type OutputFieldBindingRecord,
   isPlatformTargetQueryOutputKind,
   type OutputEvidenceKind,
+  type PartitionBindingMode,
+  type PlatformPartitionAssignment,
+  type QueryOutputBindingContract,
   type SchemaReferenceRecord,
   type StatementRecord,
   type UnknownOutcomeRecord,
@@ -36,6 +39,7 @@ type ParsedCreate = {
 export interface WriteOutputContext {
   readonly writeObservationId: string;
   readonly statementId: string;
+  readonly statementSlot?: string;
   readonly statementType: string;
   readonly writeKind: string;
   readonly rawSql: string;
@@ -50,6 +54,9 @@ export interface WriteOutputContext {
   readonly partitionStatus?:
     "NOT_PARTITIONED" | "COMPLETE" | "INCOMPLETE" | "UNKNOWN" | "CONFLICT";
   readonly partitionColumns?: readonly string[];
+  readonly partitionMode?: PartitionBindingMode;
+  readonly partitionAssignments?: readonly PlatformPartitionAssignment[];
+  readonly queryOutputBindingContract?: QueryOutputBindingContract;
   readonly evidenceRefs?: readonly string[];
 }
 
@@ -355,14 +362,28 @@ function resolvedDataset(
     : normalizeName(target);
 }
 
+function uniqueNormalizedColumns(columns: readonly unknown[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const rawColumn of columns) {
+    const column = normalizeName(String(rawColumn));
+    if (!column || seen.has(column)) continue;
+    seen.add(column);
+    result.push(column);
+  }
+  return result;
+}
+
 function nonPartitionColumns(
   schemaRef: SchemaReferenceRecord | null,
 ): string[] {
   if (!schemaRef) return [];
-  const partitions = new Set(schemaRef.partition_columns.map(normalizeName));
-  return schemaRef.physical_columns
-    .map((column) => normalizeName(String(column)))
-    .filter((column) => column && !partitions.has(column));
+  const partitions = new Set(
+    uniqueNormalizedColumns(schemaRef.partition_columns),
+  );
+  return uniqueNormalizedColumns(schemaRef.physical_columns).filter(
+    (column) => !partitions.has(column),
+  );
 }
 
 function sameColumns(
@@ -417,6 +438,241 @@ function gap(
   };
 }
 
+type PlatformBindingResolution =
+  | {
+      readonly status: "RESOLVED";
+      readonly targetColumns: readonly string[];
+      readonly targetOrdinals: readonly number[];
+      readonly staticPartitionColumns: readonly string[];
+      readonly dynamicPartitionColumns: readonly string[];
+    }
+  | {
+      readonly status: "NOT_EVALUABLE";
+      readonly reason:
+        | "PLATFORM_TARGET_PARTITION_NOT_PROVABLE"
+        | "DYNAMIC_PARTITION_BINDING_NOT_PROVABLE"
+        | "OUTPUT_BINDING_NOT_PROVABLE";
+      readonly message: string;
+      readonly extra?: Record<string, unknown>;
+    };
+
+function platformBindingResolution(
+  write: WriteOutputContext,
+  schemaRef: SchemaReferenceRecord,
+  expressionCount: number,
+): PlatformBindingResolution {
+  const fullSchemaColumns = uniqueNormalizedColumns(schemaRef.physical_columns);
+  const schemaPartitionColumns = uniqueNormalizedColumns(
+    schemaRef.partition_columns,
+  );
+  const dataColumns = nonPartitionColumns(schemaRef);
+  const declaredPartitionColumns = uniqueNormalizedColumns(
+    write.partitionColumns ?? [],
+  );
+  const mode =
+    write.partitionMode ??
+    (schemaPartitionColumns.length === 0 ? "NONE" : "UNKNOWN");
+  const dynamicMode = mode === "DYNAMIC" || mode === "MIXED";
+  const partitionGapReason = dynamicMode
+    ? ("DYNAMIC_PARTITION_BINDING_NOT_PROVABLE" as const)
+    : ("PLATFORM_TARGET_PARTITION_NOT_PROVABLE" as const);
+
+  if (!sameColumns(schemaPartitionColumns, declaredPartitionColumns)) {
+    return {
+      status: "NOT_EVALUABLE",
+      reason: partitionGapReason,
+      message:
+        "platform partition columns do not match the target Table Pack schema",
+      extra: {
+        table_pack_partition_columns: schemaPartitionColumns,
+        input_pack_partition_columns: declaredPartitionColumns,
+      },
+    };
+  }
+  if (
+    schemaPartitionColumns.length > 0 &&
+    !sameColumns(
+      fullSchemaColumns.slice(
+        fullSchemaColumns.length - schemaPartitionColumns.length,
+      ),
+      schemaPartitionColumns,
+    )
+  ) {
+    return {
+      status: "NOT_EVALUABLE",
+      reason: partitionGapReason,
+      message:
+        "target Table Pack partition fields are not the ordered suffix of the physical schema",
+      extra: {
+        physical_target_columns: fullSchemaColumns,
+        table_pack_partition_columns: schemaPartitionColumns,
+      },
+    };
+  }
+
+  if (schemaPartitionColumns.length === 0) {
+    if (
+      write.partitionStatus !== "NOT_PARTITIONED" ||
+      (mode !== "NONE" && mode !== "UNKNOWN")
+    ) {
+      return {
+        status: "NOT_EVALUABLE",
+        reason: "PLATFORM_TARGET_PARTITION_NOT_PROVABLE",
+        message: `non-partitioned platform target has conflicting partition evidence: ${write.partitionStatus ?? "UNKNOWN"}/${mode}`,
+      };
+    }
+    if (dataColumns.length !== expressionCount) {
+      return {
+        status: "NOT_EVALUABLE",
+        reason: "OUTPUT_BINDING_NOT_PROVABLE",
+        message: `SELECT output count ${expressionCount} does not match target column count ${dataColumns.length}`,
+        extra: {
+          select_output_count: expressionCount,
+          physical_target_column_count: dataColumns.length,
+        },
+      };
+    }
+    return {
+      status: "RESOLVED",
+      targetColumns: dataColumns,
+      targetOrdinals: dataColumns.map((column) =>
+        fullSchemaColumns.indexOf(column),
+      ),
+      staticPartitionColumns: [],
+      dynamicPartitionColumns: [],
+    };
+  }
+
+  if (write.partitionStatus !== "COMPLETE") {
+    return {
+      status: "NOT_EVALUABLE",
+      reason: partitionGapReason,
+      message: `platform partition declaration is not complete: ${write.partitionStatus ?? "UNKNOWN"}`,
+      extra: {
+        input_pack_partition_status: write.partitionStatus ?? "UNKNOWN",
+      },
+    };
+  }
+
+  if (write.queryOutputBindingContract !== "SPARKINDEX_FULL_WIDTH_POSITIONAL") {
+    if (expressionCount === dataColumns.length) {
+      return {
+        status: "RESOLVED",
+        targetColumns: dataColumns,
+        targetOrdinals: dataColumns.map((column) =>
+          fullSchemaColumns.indexOf(column),
+        ),
+        staticPartitionColumns: schemaPartitionColumns,
+        dynamicPartitionColumns: [],
+      };
+    }
+    if (expressionCount === fullSchemaColumns.length) {
+      return {
+        status: "RESOLVED",
+        targetColumns: fullSchemaColumns,
+        targetOrdinals: fullSchemaColumns.map((_, ordinal) => ordinal),
+        staticPartitionColumns: [],
+        dynamicPartitionColumns: schemaPartitionColumns,
+      };
+    }
+    return {
+      status: "NOT_EVALUABLE",
+      reason: "OUTPUT_BINDING_NOT_PROVABLE",
+      message: `SELECT output count ${expressionCount} matches neither non-partition target width ${dataColumns.length} nor full target width ${fullSchemaColumns.length}`,
+      extra: {
+        select_output_count: expressionCount,
+        physical_target_column_count: dataColumns.length,
+        dynamic_partition_column_count: schemaPartitionColumns.length,
+      },
+    };
+  }
+
+  const assignments = write.partitionAssignments ?? [];
+  const assignmentFields = assignments.map((assignment) =>
+    normalizeName(assignment.field),
+  );
+  const assignmentStatusesProven = assignments.every(
+    (assignment) =>
+      assignment.status === "CONFIRMED" ||
+      assignment.status === "RUNTIME_EXPRESSION",
+  );
+  if (
+    !sameColumns(assignmentFields, schemaPartitionColumns) ||
+    !assignmentStatusesProven
+  ) {
+    return {
+      status: "NOT_EVALUABLE",
+      reason: partitionGapReason,
+      message:
+        "platform partition assignments do not prove every target partition field in order",
+      extra: { partition_assignment_fields: assignmentFields },
+    };
+  }
+
+  const dynamicPartitionColumns = assignments
+    .filter(
+      (assignment) =>
+        assignment.mapping_method === "DYNAMIC_PARTITION_OUTPUT_ORDINAL",
+    )
+    .map((assignment) => normalizeName(assignment.field));
+  const staticPartitionColumns = assignments
+    .filter(
+      (assignment) =>
+        assignment.mapping_method === "STATIC_SQL_ASSIGNMENT" ||
+        assignment.mapping_method === "SCHEDULER_EXPLICIT_FIELD_VALUE",
+    )
+    .map((assignment) => normalizeName(assignment.field));
+  const classifiedCount =
+    dynamicPartitionColumns.length + staticPartitionColumns.length;
+  const modeMatchesAssignments =
+    (mode === "DYNAMIC" &&
+      dynamicPartitionColumns.length === assignments.length) ||
+    (mode === "STATIC" &&
+      staticPartitionColumns.length === assignments.length) ||
+    (mode === "MIXED" &&
+      dynamicPartitionColumns.length > 0 &&
+      staticPartitionColumns.length > 0);
+  if (classifiedCount !== assignments.length || !modeMatchesAssignments) {
+    return {
+      status: "NOT_EVALUABLE",
+      reason: partitionGapReason,
+      message: `platform partition mode ${mode} conflicts with its assignment methods`,
+    };
+  }
+
+  const targetColumns = [...dataColumns, ...dynamicPartitionColumns];
+  if (targetColumns.length !== expressionCount) {
+    return {
+      status: "NOT_EVALUABLE",
+      reason: "OUTPUT_BINDING_NOT_PROVABLE",
+      message: `SELECT output count ${expressionCount} does not match proven platform target column count ${targetColumns.length}`,
+      extra: {
+        select_output_count: expressionCount,
+        physical_target_column_count: dataColumns.length,
+        dynamic_partition_column_count: dynamicPartitionColumns.length,
+      },
+    };
+  }
+  const targetOrdinals = targetColumns.map((column) =>
+    fullSchemaColumns.indexOf(column),
+  );
+  if (targetOrdinals.some((ordinal) => ordinal < 0)) {
+    return {
+      status: "NOT_EVALUABLE",
+      reason: partitionGapReason,
+      message:
+        "a proven platform output column is absent from the target Table Pack schema",
+    };
+  }
+  return {
+    status: "RESOLVED",
+    targetColumns,
+    targetOrdinals,
+    staticPartitionColumns,
+    dynamicPartitionColumns,
+  };
+}
+
 export function deriveOutputFieldBindings(
   input: OutputBindingInput,
 ): OutputBindingResult {
@@ -444,6 +700,9 @@ export function deriveOutputFieldBindings(
       (left, right) => left.ordinal - right.ordinal,
     );
     let provenDynamicColumns: string[] = [];
+    let bindingStaticPartitionColumns = [
+      ...(parsedInsert?.staticPartitionColumns ?? []),
+    ];
     const uncovered = expressions.map((expression) => expression.ordinal);
     if (
       write.producerEnumerationStatus === "NOT_EVALUABLE" &&
@@ -501,24 +760,6 @@ export function deriveOutputFieldBindings(
       input.declaredWrites,
     );
     const dataset = resolvedDataset(target, schemaRef, input.declaredWrites);
-    if (
-      isPlatformTarget &&
-      write.partitionStatus !== "NOT_PARTITIONED" &&
-      write.partitionStatus !== "COMPLETE"
-    ) {
-      unknowns.push(
-        gap(
-          input,
-          write,
-          "NOT_EVALUABLE",
-          "PLATFORM_TARGET_PARTITION_NOT_PROVABLE",
-          `platform target partition handling is ${write.partitionStatus ?? "UNKNOWN"}`,
-          write.target,
-          { uncovered_ordinals: uncovered },
-        ),
-      );
-      continue;
-    }
     if (isInsert && !parsedInsert) {
       unknowns.push(
         gap(
@@ -615,7 +856,37 @@ export function deriveOutputFieldBindings(
     ];
 
     const explicitTargetColumns = parsedInsert?.targetColumns ?? [];
-    if (explicitTargetColumns.length > 0) {
+    if (isPlatformTarget) {
+      const resolution = platformBindingResolution(
+        write,
+        schemaRef!,
+        expressions.length,
+      );
+      if (resolution.status === "NOT_EVALUABLE") {
+        unknowns.push(
+          gap(
+            input,
+            write,
+            "NOT_EVALUABLE",
+            resolution.reason,
+            resolution.message,
+            dataset,
+            { uncovered_ordinals: uncovered, ...(resolution.extra ?? {}) },
+          ),
+        );
+        continue;
+      }
+      targetColumns = [...resolution.targetColumns];
+      targetOrdinals = [...resolution.targetOrdinals];
+      bindingStaticPartitionColumns = [...resolution.staticPartitionColumns];
+      provenDynamicColumns = [...resolution.dynamicPartitionColumns];
+      bindingMethod = "TARGET_SCHEMA_POSITIONAL";
+      evidenceRefs.push(
+        ...(write.partitionAssignments ?? []).flatMap(
+          (assignment) => assignment.evidence_refs,
+        ),
+      );
+    } else if (explicitTargetColumns.length > 0) {
       targetColumns = [...explicitTargetColumns];
       targetOrdinals = targetColumns.map((_, ordinal) => ordinal);
       bindingMethod = "EXPLICIT_TARGET_COLUMN_LIST";
@@ -637,21 +908,6 @@ export function deriveOutputFieldBindings(
       );
       targetOrdinals = targetColumns.map((column, ordinal) => {
         const schemaOrdinal = fullSchemaColumns.indexOf(normalizeName(column));
-        return schemaOrdinal >= 0 ? schemaOrdinal : ordinal;
-      });
-      bindingMethod = "TARGET_SCHEMA_POSITIONAL";
-    } else if (
-      isPlatformTarget &&
-      schemaRef &&
-      schemaRef.physical_columns.length === expressions.length
-    ) {
-      targetColumns = schemaRef.physical_columns.map((column) =>
-        normalizeName(String(column)),
-      );
-      targetOrdinals = targetColumns.map((column, ordinal) => {
-        const schemaOrdinal = schemaRef.physical_columns.findIndex(
-          (candidate) => normalizeName(String(candidate)) === column,
-        );
         return schemaOrdinal >= 0 ? schemaOrdinal : ordinal;
       });
       bindingMethod = "TARGET_SCHEMA_POSITIONAL";
@@ -791,11 +1047,8 @@ export function deriveOutputFieldBindings(
         binding_method: bindingMethod,
         binding_status: "RESOLVED",
         target_schema_status: targetSchemaStatus,
-        static_partition_columns: [
-          ...(parsedInsert?.staticPartitionColumns ?? []),
-          ...(parsedInsert?.dynamicPartitionColumns ?? []),
-          ...(!parsedInsert ? (write.partitionColumns ?? []) : []),
-        ],
+        static_partition_columns: bindingStaticPartitionColumns,
+        dynamic_partition_columns: provenDynamicColumns,
         evidence_refs: [...new Set(evidenceRefs)].sort(),
         evidence_kind: isPlatformTarget
           ? write.evidenceKind

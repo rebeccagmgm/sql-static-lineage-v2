@@ -1722,6 +1722,193 @@ export function validateBundle(bundleDir: string): string[] {
     }
   }
   for (const write of writeObservations.values()) {
+    if (write.write_kind !== PACK_DECLARED_QUERY_OUTPUT) continue;
+    const partitionColumns = Array.isArray(write.partition_columns)
+      ? write.partition_columns.map((column: unknown) =>
+          normalizeName(String(column)),
+        )
+      : [];
+    const staticPartitionColumns = Array.isArray(write.static_partition_columns)
+      ? write.static_partition_columns.map((column: unknown) =>
+          normalizeName(String(column)),
+        )
+      : [];
+    const dynamicPartitionColumns = Array.isArray(
+      write.dynamic_partition_columns,
+    )
+      ? write.dynamic_partition_columns.map((column: unknown) =>
+          normalizeName(String(column)),
+        )
+      : [];
+    const assignmentFields = Array.isArray(write.partition_assignments)
+      ? write.partition_assignments.map((assignment: unknown) =>
+          normalizeName(
+            String(
+              assignment && typeof assignment === "object"
+                ? ((assignment as JsonRecord).field ?? "")
+                : "",
+            ),
+          ),
+        )
+      : [];
+    const writeBindings = bindings.filter(
+      (binding) => binding.write_observation_id === write.write_observation_id,
+    );
+    const producerOrdinals = Array.isArray(write.producer_ordinals)
+      ? write.producer_ordinals.filter((ordinal: unknown): ordinal is number =>
+          Number.isInteger(ordinal),
+        )
+      : [];
+    const fullyBound =
+      producerOrdinals.length > 0 &&
+      writeBindings.length === producerOrdinals.length;
+    if (
+      write.target_resolution_method !== "DIRECT_PLATFORM_TARGET" &&
+      write.target_resolution_method !== "SPARKINDEX_TASK_TARGET"
+    ) {
+      errors.push(
+        `pack-declared target resolution method is invalid ${write.write_observation_id}`,
+      );
+    }
+    if (
+      write.query_output_binding_contract !==
+        "SPARKINDEX_FULL_WIDTH_POSITIONAL" &&
+      write.query_output_binding_contract !==
+        "PLATFORM_TARGET_SCHEMA_POSITIONAL"
+    ) {
+      errors.push(
+        `pack-declared query output binding contract is invalid ${write.write_observation_id}`,
+      );
+    }
+    if (
+      !["STATIC", "DYNAMIC", "MIXED", "NONE", "UNKNOWN"].includes(
+        write.partition_mode,
+      )
+    ) {
+      errors.push(
+        `pack-declared partition mode is invalid ${write.write_observation_id}`,
+      );
+    }
+    if (
+      ![
+        "NOT_PARTITIONED",
+        "COMPLETE",
+        "INCOMPLETE",
+        "UNKNOWN",
+        "CONFLICT",
+      ].includes(write.partition_status)
+    ) {
+      errors.push(
+        `pack-declared partition status is invalid ${write.write_observation_id}`,
+      );
+    }
+    if (
+      ![
+        "NOT_PARTITIONED",
+        "COMPLETE",
+        "INCOMPLETE",
+        "UNKNOWN",
+        "CONFLICT",
+      ].includes(write.partition_binding_status)
+    ) {
+      errors.push(
+        `pack-declared partition binding status is invalid ${write.write_observation_id}`,
+      );
+    }
+    if (write.partition_mode === "NONE") {
+      if (
+        partitionColumns.length > 0 ||
+        staticPartitionColumns.length > 0 ||
+        dynamicPartitionColumns.length > 0 ||
+        assignmentFields.length > 0
+      ) {
+        errors.push(
+          `non-partitioned pack-declared write carries partition columns ${write.write_observation_id}`,
+        );
+      }
+      if (
+        write.partition_status !== "NOT_PARTITIONED" ||
+        write.partition_binding_status !== "NOT_PARTITIONED"
+      ) {
+        errors.push(
+          `non-partitioned pack-declared write has inconsistent status ${write.write_observation_id}`,
+        );
+      }
+      continue;
+    }
+    if (
+      write.partition_mode === "DYNAMIC" ||
+      write.partition_mode === "STATIC" ||
+      write.partition_mode === "MIXED"
+    ) {
+      if (
+        (write.query_output_binding_contract ===
+          "SPARKINDEX_FULL_WIDTH_POSITIONAL" ||
+          assignmentFields.length > 0) &&
+        JSON.stringify(assignmentFields) !== JSON.stringify(partitionColumns)
+      ) {
+        errors.push(
+          `pack-declared partition assignments do not match declared columns ${write.write_observation_id}`,
+        );
+      }
+      const classified = new Set([
+        ...staticPartitionColumns,
+        ...dynamicPartitionColumns,
+      ]);
+      if (
+        classified.size !== partitionColumns.length ||
+        partitionColumns.some((column: string) => !classified.has(column)) ||
+        staticPartitionColumns.some((column: string) =>
+          dynamicPartitionColumns.includes(column),
+        )
+      ) {
+        errors.push(
+          `pack-declared partition classification is inconsistent ${write.write_observation_id}`,
+        );
+      }
+      if (
+        write.partition_mode === "DYNAMIC" &&
+        staticPartitionColumns.length > 0
+      )
+        errors.push(
+          `dynamic pack-declared write carries static partitions ${write.write_observation_id}`,
+        );
+      if (
+        write.partition_mode === "STATIC" &&
+        dynamicPartitionColumns.length > 0
+      )
+        errors.push(
+          `static pack-declared write carries dynamic partitions ${write.write_observation_id}`,
+        );
+      if (
+        write.partition_mode === "MIXED" &&
+        (staticPartitionColumns.length === 0 ||
+          dynamicPartitionColumns.length === 0)
+      )
+        errors.push(
+          `mixed pack-declared write lacks both partition classes ${write.write_observation_id}`,
+        );
+    }
+    if (
+      partitionColumns.length > 0 &&
+      fullyBound &&
+      write.partition_binding_status !== "COMPLETE"
+    ) {
+      errors.push(
+        `fully bound pack-declared partition write is not COMPLETE ${write.write_observation_id}`,
+      );
+    }
+    if (
+      partitionColumns.length > 0 &&
+      !fullyBound &&
+      write.partition_binding_status === "COMPLETE"
+    ) {
+      errors.push(
+        `unbound pack-declared partition write is incorrectly COMPLETE ${write.write_observation_id}`,
+      );
+    }
+  }
+  for (const write of writeObservations.values()) {
     if (write.field_producing !== true) continue;
     const producerOrdinals = Array.isArray(write.producer_ordinals)
       ? write.producer_ordinals.filter((ordinal: unknown): ordinal is number =>
@@ -1937,6 +2124,7 @@ function buildTaskBundle(
   const queryOutputCandidates: Array<{
     readonly statementId: string;
     readonly statementIndex: number;
+    readonly statementSlot?: string;
     readonly statementType: string;
     readonly rawSql: string;
     readonly expressions: readonly FieldExpressionRecord[];
@@ -2092,6 +2280,7 @@ function buildTaskBundle(
       queryOutputCandidates.push({
         statementId,
         statementIndex,
+        statementSlot,
         statementType,
         rawSql,
         expressions: producerExpressions,
@@ -2165,6 +2354,7 @@ function buildTaskBundle(
       writeContexts.push({
         writeObservationId,
         statementId,
+        statementSlot,
         statementType,
         writeKind,
         rawSql,
@@ -2198,19 +2388,27 @@ function buildTaskBundle(
   const platformTargetName = task.platform_target_query_output
     ? normalizeName(task.platform_target_query_output.target)
     : null;
+  const platformQueryOutputSlot =
+    task.platform_target_query_output?.query_output_slot ??
+    task.input_pack_provenance?.sql_slot ??
+    task.sql_slot;
+  const platformQueryOutputCandidates = queryOutputCandidates.filter(
+    (candidate) =>
+      platformQueryOutputSlot === undefined ||
+      candidate.statementSlot === platformQueryOutputSlot,
+  );
   const hasExplicitPlatformTargetWrite =
     platformTargetName !== null &&
-    writeContexts.some((write) => {
-      const candidate = normalizeName(write.target);
-      return (
-        candidate === platformTargetName ||
-        candidate.split(".").at(-1) === platformTargetName.split(".").at(-1)
-      );
-    });
+    writeContexts.some(
+      (write) =>
+        normalizeName(write.target) === platformTargetName &&
+        (platformQueryOutputSlot === undefined ||
+          write.statementSlot === platformQueryOutputSlot),
+    );
   if (task.platform_target_query_output && !hasExplicitPlatformTargetWrite) {
     const target = normalizeName(task.platform_target_query_output.target);
     const uniqueQueryOutputCandidates = dedupeEquivalentQueryOutputs(
-      queryOutputCandidates,
+      platformQueryOutputCandidates,
     );
     if (
       uniqueQueryOutputCandidates.length === 1 &&
@@ -2221,6 +2419,33 @@ function buildTaskBundle(
         task.task_id,
         candidate.statementIndex,
       );
+      const partitionAssignments =
+        task.platform_target_query_output.partition_assignments ?? [];
+      const partitionMode =
+        task.platform_target_query_output.partition_mode ?? "UNKNOWN";
+      const partitionColumns =
+        task.platform_target_query_output.partition_columns.map(normalizeName);
+      const dynamicPartitionColumns =
+        partitionMode === "DYNAMIC"
+          ? partitionColumns
+          : partitionAssignments
+              .filter(
+                (assignment) =>
+                  assignment.mapping_method ===
+                  "DYNAMIC_PARTITION_OUTPUT_ORDINAL",
+              )
+              .map((assignment) => normalizeName(assignment.field));
+      const staticPartitionColumns =
+        partitionMode === "STATIC"
+          ? partitionColumns
+          : partitionAssignments
+              .filter(
+                (assignment) =>
+                  assignment.mapping_method === "STATIC_SQL_ASSIGNMENT" ||
+                  assignment.mapping_method ===
+                    "SCHEDULER_EXPLICIT_FIELD_VALUE",
+              )
+              .map((assignment) => normalizeName(assignment.field));
       datasetIo.push({
         task_id: task.task_id,
         statement_id: candidate.statementId,
@@ -2239,6 +2464,16 @@ function buildTaskBundle(
         ),
         producer_enumeration_status: "COMPLETE",
         field_producing: true,
+        target_resolution_method:
+          task.platform_target_query_output.target_resolution_method,
+        query_output_binding_contract:
+          task.platform_target_query_output.query_output_binding_contract,
+        partition_status: task.platform_target_query_output.partition_status,
+        partition_mode: partitionMode,
+        partition_columns: partitionColumns,
+        partition_assignments: partitionAssignments,
+        static_partition_columns: staticPartitionColumns,
+        dynamic_partition_columns: dynamicPartitionColumns,
         source_as_boundary: {
           proven: true,
           statement_span:
@@ -2250,6 +2485,7 @@ function buildTaskBundle(
       writeContexts.push({
         writeObservationId,
         statementId: candidate.statementId,
+        statementSlot: candidate.statementSlot,
         statementType: "PLATFORM_TARGET_QUERY",
         writeKind: PACK_DECLARED_QUERY_OUTPUT,
         rawSql: candidate.rawSql,
@@ -2262,6 +2498,11 @@ function buildTaskBundle(
         sourceSqlSha256,
         partitionStatus: task.platform_target_query_output.partition_status,
         partitionColumns: task.platform_target_query_output.partition_columns,
+        partitionMode: task.platform_target_query_output.partition_mode,
+        partitionAssignments:
+          task.platform_target_query_output.partition_assignments,
+        queryOutputBindingContract:
+          task.platform_target_query_output.query_output_binding_contract,
         evidenceRefs: task.platform_target_query_output.evidence_refs,
       });
     } else if (
@@ -2283,7 +2524,7 @@ function buildTaskBundle(
         task_id: task.task_id,
         outcome_class: "NOT_EVALUABLE",
         reason_code: "PLATFORM_TARGET_QUERY_BOUNDARY_NOT_PROVABLE",
-        message: `platform target requires exactly one enumerable query producer; observed ${uniqueQueryOutputCandidates.length} distinct outputs from ${queryOutputCandidates.length} candidates`,
+        message: `platform target requires exactly one enumerable query producer in slot ${platformQueryOutputSlot ?? "UNKNOWN"}; observed ${uniqueQueryOutputCandidates.length} distinct outputs from ${platformQueryOutputCandidates.length} candidates`,
         subject: target,
       });
     }
@@ -2298,6 +2539,80 @@ function buildTaskBundle(
   });
   outputBindings.push(...outputBindingResult.bindings);
   unknowns.push(...outputBindingResult.unknowns);
+  for (const [index, record] of datasetIo.entries()) {
+    if (
+      record.write_kind !== PACK_DECLARED_QUERY_OUTPUT ||
+      typeof record.write_observation_id !== "string"
+    )
+      continue;
+    const producerCount = Array.isArray(record.producer_ordinals)
+      ? record.producer_ordinals.length
+      : 0;
+    const writeBindings = outputBindings.filter(
+      (binding) => binding.write_observation_id === record.write_observation_id,
+    );
+    const fullyBound =
+      producerCount > 0 && writeBindings.length === producerCount;
+    const boundStaticColumns = [
+      ...new Set(
+        writeBindings
+          .flatMap((binding) => binding.static_partition_columns)
+          .map(normalizeName),
+      ),
+    ];
+    const boundDynamicColumns = [
+      ...new Set(
+        writeBindings
+          .flatMap((binding) => binding.dynamic_partition_columns ?? [])
+          .map(normalizeName),
+      ),
+    ];
+    let partitionMode = record.partition_mode;
+    let staticPartitionColumns = record.static_partition_columns;
+    let dynamicPartitionColumns = record.dynamic_partition_columns;
+    if (fullyBound) {
+      staticPartitionColumns = boundStaticColumns;
+      dynamicPartitionColumns = boundDynamicColumns;
+      partitionMode =
+        boundStaticColumns.length > 0 && boundDynamicColumns.length > 0
+          ? "MIXED"
+          : boundStaticColumns.length > 0
+            ? "STATIC"
+            : boundDynamicColumns.length > 0
+              ? "DYNAMIC"
+              : "NONE";
+    }
+    const assignmentConflict =
+      Array.isArray(record.partition_assignments) &&
+      record.partition_assignments.some(
+        (assignment: unknown) =>
+          assignment !== null &&
+          typeof assignment === "object" &&
+          (assignment as JsonRecord).status === "CONFLICT",
+      );
+    let partitionBindingStatus: DatasetIoRecord["partition_binding_status"];
+    if (record.partition_status === "CONFLICT" || assignmentConflict)
+      partitionBindingStatus = "CONFLICT";
+    else if (
+      partitionMode === "NONE" &&
+      record.partition_status === "NOT_PARTITIONED"
+    ) {
+      partitionBindingStatus = "NOT_PARTITIONED";
+    } else if (fullyBound) partitionBindingStatus = "COMPLETE";
+    else if (
+      record.partition_status === "UNKNOWN" ||
+      partitionMode === "UNKNOWN"
+    ) {
+      partitionBindingStatus = "UNKNOWN";
+    } else partitionBindingStatus = "INCOMPLETE";
+    datasetIo[index] = {
+      ...record,
+      partition_binding_status: partitionBindingStatus,
+      partition_mode: partitionMode,
+      static_partition_columns: staticPartitionColumns,
+      dynamic_partition_columns: dynamicPartitionColumns,
+    };
+  }
   const taskLocalMaterializations = deriveTaskLocalMaterializations(
     task.task_id,
     logicalSourceId,

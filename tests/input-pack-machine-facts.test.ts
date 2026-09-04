@@ -184,6 +184,9 @@ describe("Input Pack-driven Machine Facts", () => {
           write_kind: "PACK_DECLARED_QUERY_OUTPUT",
           provenance: "PLATFORM_TARGET",
           source_sql_sha256: manifest.inputs.input_pack.sql_sha256,
+          partition_status: "NOT_PARTITIONED",
+          partition_binding_status: "NOT_PARTITIONED",
+          partition_mode: "NONE",
         }),
       ]),
     );
@@ -200,7 +203,6 @@ describe("Input Pack-driven Machine Facts", () => {
         dataSource: "warehouse",
         qualifiedName: "demo.partitioned",
       },
-      targetEvidenceKind: "DIRECT_PLATFORM_TARGET",
       partition: { p: "A" },
       sql: {
         query: {
@@ -210,6 +212,23 @@ describe("Input Pack-driven Machine Facts", () => {
       },
       evidenceProvider: "synthetic:test",
       collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const prepared = prepareInputPackTask({
+      dataRoot: f.dataRoot,
+      taskId: "1150",
+    });
+    expect(prepared.profileTask.platform_target_query_output).toMatchObject({
+      target_resolution_method: "SPARKINDEX_TASK_TARGET",
+      partition_status: "COMPLETE",
+      partition_mode: "DYNAMIC",
+      partition_assignments: [
+        {
+          field: "p",
+          status: "CONFIRMED",
+          mapping_method: "DYNAMIC_PARTITION_OUTPUT_ORDINAL",
+        },
+      ],
     });
 
     const result = runInputPackMachineFacts({
@@ -225,10 +244,451 @@ describe("Input Pack-driven Machine Facts", () => {
       "p",
     ]);
     expect(
+      bindings.every(
+        (binding) =>
+          Array.isArray(binding.static_partition_columns) &&
+          binding.static_partition_columns.length === 0,
+      ),
+    ).toBe(true);
+    expect(
+      jsonl(join(bundle, "dataset-io.jsonl")).find(
+        (record) => record.write_kind === "PACK_DECLARED_QUERY_OUTPUT",
+      ),
+    ).toMatchObject({
+      partition_status: "COMPLETE",
+      partition_mode: "DYNAMIC",
+      partition_columns: ["p"],
+      static_partition_columns: [],
+      dynamic_partition_columns: ["p"],
+    });
+    expect(
       jsonl(join(bundle, "unknowns.jsonl")).some(
         (unknown) => unknown.reason_code === "OUTPUT_BINDING_NOT_PROVABLE",
       ),
     ).toBe(false);
+  });
+
+  it("uses complete Pack partition evidence for a positional dynamic tail", () => {
+    const f = fixture();
+    writeTableInput(f.dataRoot, {
+      platform: "hive",
+      dataSource: "warehouse",
+      qualifiedName: "demo.partition_source",
+      objectType: "hive_table",
+      partitionFields: [],
+      ddl: "CREATE TABLE demo.partition_source (value_col STRING, p STRING);",
+      evidenceProvider: "synthetic:test",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+    writeTaskInput(f.dataRoot, {
+      taskId: "1152",
+      taskCategory: "sparkIndex",
+      taskName: "demo.source.field.partition.tail",
+      target: {
+        platform: "hive",
+        dataSource: "warehouse",
+        qualifiedName: "demo.partitioned",
+      },
+      partition: { p: "*" },
+      sql: {
+        query: {
+          content:
+            "SELECT s.value_col AS value_col, s.p FROM demo.partition_source s;",
+          evidenceProvider: "synthetic:test",
+        },
+      },
+      evidenceProvider: "synthetic:test",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const prepared = prepareInputPackTask({
+      dataRoot: f.dataRoot,
+      taskId: "1152",
+    });
+    expect(prepared.profileTask.platform_target_query_output).toMatchObject({
+      partition_status: "COMPLETE",
+      partition_mode: "DYNAMIC",
+      partition_assignments: [
+        {
+          field: "p",
+          status: "RUNTIME_EXPRESSION",
+          mapping_method: "DYNAMIC_PARTITION_OUTPUT_ORDINAL",
+        },
+      ],
+    });
+
+    const result = runInputPackMachineFacts({
+      dataRoot: f.dataRoot,
+      taskIds: ["1152"],
+      outputRoot: f.factsRoot,
+    });
+    expect(result.tasks[0]?.state).toBe("SUCCESS");
+    const bundle = join(f.factsRoot, "registry", "tasks", "1152", "bundle");
+    expect(
+      jsonl(join(bundle, "output-field-bindings.jsonl")).map(
+        (binding) => binding.target_field,
+      ),
+    ).toEqual(["value_col", "p"]);
+    expect(jsonl(join(bundle, "unknowns.jsonl"))).toHaveLength(0);
+  });
+
+  it("does not reinterpret a short SparkIndex SELECT as a static partition write", () => {
+    const f = fixture();
+    writeTaskInput(f.dataRoot, {
+      taskId: "1153",
+      taskCategory: "sparkIndex",
+      taskName: "demo.short.dynamic.partition.output",
+      target: {
+        platform: "hive",
+        dataSource: "warehouse",
+        qualifiedName: "demo.partitioned",
+      },
+      partition: { p: "A" },
+      sql: {
+        query: {
+          content: "SELECT e.src_a AS value_col FROM demo.extra e;",
+          evidenceProvider: "synthetic:test",
+        },
+      },
+      evidenceProvider: "synthetic:test",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const result = runInputPackMachineFacts({
+      dataRoot: f.dataRoot,
+      taskIds: ["1153"],
+      outputRoot: f.factsRoot,
+    });
+    expect(result.tasks[0]?.state).toBe("SUCCESS");
+    const bundle = join(f.factsRoot, "registry", "tasks", "1153", "bundle");
+    expect(jsonl(join(bundle, "output-field-bindings.jsonl"))).toHaveLength(0);
+    expect(
+      jsonl(join(bundle, "dataset-io.jsonl")).find(
+        (record) => record.write_kind === "PACK_DECLARED_QUERY_OUTPUT",
+      ),
+    ).toMatchObject({
+      partition_status: "COMPLETE",
+      partition_binding_status: "INCOMPLETE",
+      partition_mode: "DYNAMIC",
+    });
+    expect(jsonl(join(bundle, "unknowns.jsonl"))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason_code: "OUTPUT_BINDING_NOT_PROVABLE",
+          select_output_count: 1,
+          dynamic_partition_column_count: 1,
+        }),
+      ]),
+    );
+  });
+
+  it("does not infer a platform query write outside the legacy SparkIndex target contract", () => {
+    const f = fixture();
+    writeTaskInput(f.dataRoot, {
+      taskId: "1151",
+      taskCategory: "hiveTask",
+      taskName: "demo.non.spark.query",
+      target: {
+        platform: "hive",
+        dataSource: "warehouse",
+        qualifiedName: "demo.root",
+      },
+      partition: null,
+      sql: {
+        query: {
+          content:
+            "SELECT e.src_a AS out_a, e.src_a AS out_b FROM demo.extra e;",
+          evidenceProvider: "synthetic:test",
+        },
+      },
+      evidenceProvider: "synthetic:test",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+    writeTaskInput(f.dataRoot, {
+      taskId: "1155",
+      taskCategory: "sparkIndex",
+      taskName: "demo.explicitly.unknown.target",
+      target: {
+        platform: "hive",
+        dataSource: "warehouse",
+        qualifiedName: "demo.root",
+      },
+      targetEvidenceKind: null,
+      partition: null,
+      sql: {
+        query: {
+          content:
+            "SELECT e.src_a AS out_a, e.src_a AS out_b FROM demo.extra e;",
+          evidenceProvider: "synthetic:test",
+        },
+      },
+      evidenceProvider: "synthetic:test",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const result = runInputPackMachineFacts({
+      dataRoot: f.dataRoot,
+      taskIds: ["1151", "1155"],
+      outputRoot: f.factsRoot,
+    });
+    expect(result.tasks.map((task) => task.state)).toEqual(["SUCCESS", "SUCCESS"]);
+    for (const taskId of ["1151", "1155"]) {
+      const bundle = join(f.factsRoot, "registry", "tasks", taskId, "bundle");
+      expect(jsonl(join(bundle, "output-field-bindings.jsonl"))).toHaveLength(0);
+      expect(
+        jsonl(join(bundle, "dataset-io.jsonl")).some(
+          (record) => record.write_kind === "PACK_DECLARED_QUERY_OUTPUT",
+        ),
+      ).toBe(false);
+    }
+  });
+
+  it("preserves the non-SparkIndex platform contract where partition columns are outside SELECT", () => {
+    const f = fixture();
+    writeTaskInput(f.dataRoot, {
+      taskId: "1156",
+      taskCategory: "postgre2hive",
+      taskName: "demo.non.spark.static.partition.output",
+      target: {
+        platform: "hive",
+        dataSource: "warehouse",
+        qualifiedName: "demo.partitioned",
+      },
+      targetEvidenceKind: "DIRECT_PLATFORM_TARGET",
+      partition: { p: "A" },
+      sql: {
+        query: {
+          content: "SELECT e.src_a AS value_col FROM demo.extra e;",
+          evidenceProvider: "synthetic:test",
+        },
+      },
+      evidenceProvider: "synthetic:test",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const prepared = prepareInputPackTask({
+      dataRoot: f.dataRoot,
+      taskId: "1156",
+    });
+    expect(prepared.profileTask.platform_target_query_output).toMatchObject({
+      target_resolution_method: "DIRECT_PLATFORM_TARGET",
+      query_output_binding_contract: "PLATFORM_TARGET_SCHEMA_POSITIONAL",
+      partition_status: "COMPLETE",
+    });
+    const result = runInputPackMachineFacts({
+      dataRoot: f.dataRoot,
+      taskIds: ["1156"],
+      outputRoot: f.factsRoot,
+    });
+    expect(result.tasks[0]?.state).toBe("SUCCESS");
+    const bundle = join(f.factsRoot, "registry", "tasks", "1156", "bundle");
+    const bindings = jsonl(join(bundle, "output-field-bindings.jsonl"));
+    expect(bindings.map((binding) => binding.target_field)).toEqual(["value_col"]);
+    expect(bindings[0]).toMatchObject({
+      static_partition_columns: ["p"],
+      dynamic_partition_columns: [],
+    });
+    expect(jsonl(join(bundle, "unknowns.jsonl"))).toHaveLength(0);
+  });
+
+  it("fails closed when a SparkIndex partition literal conflicts with the Pack", () => {
+    const f = fixture();
+    writeTaskInput(f.dataRoot, {
+      taskId: "1157",
+      taskCategory: "sparkIndex",
+      taskName: "demo.conflicting.dynamic.partition.output",
+      target: {
+        platform: "hive",
+        dataSource: "warehouse",
+        qualifiedName: "demo.partitioned",
+      },
+      partition: { p: "A" },
+      sql: {
+        query: {
+          content: "SELECT e.src_a AS value_col, 'B' AS p FROM demo.extra e;",
+          evidenceProvider: "synthetic:test",
+        },
+      },
+      evidenceProvider: "synthetic:test",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const result = runInputPackMachineFacts({
+      dataRoot: f.dataRoot,
+      taskIds: ["1157"],
+      outputRoot: f.factsRoot,
+    });
+    expect(result.tasks[0]?.state).toBe("SUCCESS");
+    const bundle = join(f.factsRoot, "registry", "tasks", "1157", "bundle");
+    expect(jsonl(join(bundle, "output-field-bindings.jsonl"))).toHaveLength(0);
+    expect(
+      jsonl(join(bundle, "dataset-io.jsonl")).find(
+        (record) => record.write_kind === "PACK_DECLARED_QUERY_OUTPUT",
+      ),
+    ).toMatchObject({
+      partition_binding_status: "CONFLICT",
+      partition_mode: "DYNAMIC",
+      partition_assignments: [
+        expect.objectContaining({
+          field: "p",
+          status: "CONFLICT",
+          mapping_method: "CONFLICT",
+        }),
+      ],
+    });
+    expect(jsonl(join(bundle, "unknowns.jsonl"))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason_code: "DYNAMIC_PARTITION_BINDING_NOT_PROVABLE",
+        }),
+      ]),
+    );
+  });
+
+  it("keeps the query platform write separate from an explicit prepare write to the same target", () => {
+    const f = fixture();
+    writeTaskInput(f.dataRoot, {
+      taskId: "1154",
+      taskCategory: "sparkIndex",
+      taskName: "demo.prepare.and.platform.output",
+      target: {
+        platform: "hive",
+        dataSource: "warehouse",
+        qualifiedName: "demo.root",
+      },
+      partition: null,
+      sql: {
+        prepare: {
+          content:
+            "INSERT OVERWRITE TABLE demo.root SELECT e.src_a AS out_a, e.src_a AS out_b FROM demo.extra e;",
+          evidenceProvider: "synthetic:test",
+        },
+        query: {
+          content:
+            "SELECT m.mid_a AS out_a, m.filter_key AS out_b FROM demo.mid m;",
+          evidenceProvider: "synthetic:test",
+        },
+      },
+      evidenceProvider: "synthetic:test",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const result = runInputPackMachineFacts({
+      dataRoot: f.dataRoot,
+      taskIds: ["1154"],
+      outputRoot: f.factsRoot,
+    });
+    expect(result.tasks[0]?.state).toBe("SUCCESS");
+    const bundle = join(f.factsRoot, "registry", "tasks", "1154", "bundle");
+    const writes = jsonl(join(bundle, "dataset-io.jsonl")).filter(
+      (record) =>
+        record.direction === "WRITE" &&
+        record.physical_dataset === "demo.root" &&
+        typeof record.write_observation_id === "string",
+    );
+    expect(writes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          write_kind: "INSERT_OVERWRITE",
+          write_statement_id: expect.stringContaining(":slot:prepare:"),
+        }),
+        expect.objectContaining({
+          write_kind: "PACK_DECLARED_QUERY_OUTPUT",
+          write_statement_id: expect.stringContaining(":slot:query:"),
+        }),
+      ]),
+    );
+    expect(writes).toHaveLength(2);
+  });
+
+  it("binds a proven static platform partition outside the SELECT ordinals", () => {
+    const f = fixture();
+    writeTaskInput(f.dataRoot, {
+      taskId: "1160",
+      taskCategory: "sparkIndex",
+      taskName: "demo.static.partitioned.platform.query",
+      target: {
+        platform: "hive",
+        dataSource: "warehouse",
+        qualifiedName: "demo.partitioned",
+      },
+      targetEvidenceKind: "DIRECT_PLATFORM_TARGET",
+      partition: { p: "A" },
+      sql: {
+        query: {
+          content:
+            "ALTER TABLE demo.partitioned ADD PARTITION (p='A'); SELECT e.src_a AS value_col FROM demo.extra e;",
+          evidenceProvider: "synthetic:test",
+        },
+      },
+      evidenceProvider: "synthetic:test",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const result = runInputPackMachineFacts({
+      dataRoot: f.dataRoot,
+      taskIds: ["1160"],
+      outputRoot: f.factsRoot,
+    });
+    expect(result.tasks[0]?.state).toBe("SUCCESS");
+    const bundle = join(f.factsRoot, "registry", "tasks", "1160", "bundle");
+    const bindings = jsonl(join(bundle, "output-field-bindings.jsonl"));
+    expect(bindings.map((binding) => binding.target_field)).toEqual([
+      "value_col",
+    ]);
+    expect(bindings[0]?.static_partition_columns).toEqual(["p"]);
+    expect(
+      jsonl(join(bundle, "dataset-io.jsonl")).find(
+        (record) => record.write_kind === "PACK_DECLARED_QUERY_OUTPUT",
+      ),
+    ).toMatchObject({
+      partition_status: "COMPLETE",
+      partition_binding_status: "COMPLETE",
+      partition_mode: "STATIC",
+      partition_columns: ["p"],
+      static_partition_columns: ["p"],
+      dynamic_partition_columns: [],
+    });
+  });
+
+  it("fails closed when a platform dynamic partition tail lacks Pack partition proof", () => {
+    const f = fixture();
+    writeTaskInput(f.dataRoot, {
+      taskId: "1170",
+      taskCategory: "sparkIndex",
+      taskName: "demo.unproven.partitioned.platform.query",
+      target: {
+        platform: "hive",
+        dataSource: "warehouse",
+        qualifiedName: "demo.partitioned",
+      },
+      targetEvidenceKind: "DIRECT_PLATFORM_TARGET",
+      sql: {
+        query: {
+          content:
+            "SELECT e.src_a AS value_col, 'A' AS p FROM demo.extra e;",
+          evidenceProvider: "synthetic:test",
+        },
+      },
+      evidenceProvider: "synthetic:test",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const result = runInputPackMachineFacts({
+      dataRoot: f.dataRoot,
+      taskIds: ["1170"],
+      outputRoot: f.factsRoot,
+    });
+    expect(result.tasks[0]?.state).toBe("SUCCESS");
+    const bundle = join(f.factsRoot, "registry", "tasks", "1170", "bundle");
+    expect(jsonl(join(bundle, "output-field-bindings.jsonl"))).toHaveLength(0);
+    expect(jsonl(join(bundle, "unknowns.jsonl"))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason_code: "DYNAMIC_PARTITION_BINDING_NOT_PROVABLE",
+        }),
+      ]),
+    );
   });
 
   it("deduplicates semantically equivalent query outputs before platform binding", () => {
@@ -420,6 +880,21 @@ describe("Input Pack-driven Machine Facts", () => {
       second.tasks[0]?.manifest_sha256,
     );
     expect(second.tasks[0]?.status).toBe("REUSED");
+    expect(
+      JSON.parse(
+        readFileSync(
+          join(
+            f.factsRoot,
+            "registry",
+            "tasks",
+            "100",
+            "bundle",
+            "manifest.json",
+          ),
+          "utf8",
+        ),
+      ).method.adapter.version,
+    ).toBe("1.3.8");
   });
 
   it("builds a task-scoped schema bundle from physical SQL references", () => {
@@ -490,6 +965,10 @@ describe("Input Pack-driven Machine Facts", () => {
     expect(
       bindings.find((binding) => binding.target_field === "p")
         ?.static_partition_columns,
+    ).toEqual([]);
+    expect(
+      bindings.find((binding) => binding.target_field === "p")
+        ?.dynamic_partition_columns,
     ).toEqual(["p"]);
   });
 
@@ -545,7 +1024,10 @@ describe("Input Pack-driven Machine Facts", () => {
           const columns = Array.isArray(binding.static_partition_columns)
             ? binding.static_partition_columns
             : [];
-          return columns.length === 1 && columns[0] === "p";
+          const dynamicColumns = Array.isArray(binding.dynamic_partition_columns)
+            ? binding.dynamic_partition_columns
+            : [];
+          return columns.length === 0 && dynamicColumns.length === 1 && dynamicColumns[0] === "p";
         },
       ),
     ).toBe(true);

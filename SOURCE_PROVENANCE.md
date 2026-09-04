@@ -17,6 +17,13 @@ The initial v2 files were copied from that working tree, so the baseline can
 contain useful source changes that were not represented by the commit alone.
 The original repository remains the recovery source for its full history.
 
+### Imported after baseline
+
+- `c772a56f1800cbd91016d876b31dc8f13cd07a77` — imported the Machine Facts
+  SparkIndex output adaptation (code, schema, and focused tests only).
+- `3ae8167ef7294ba19fd449b6c7fe933e6d8fd7d0` — not imported because it only
+  removes trailing whitespace from curated documentation.
+
 ## Data Graph source
 
 - Repository: `data-graph`

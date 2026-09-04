@@ -19,6 +19,16 @@ describe("DDL schema reader", () => {
 		expect(result.warnings).toEqual([]);
 	});
 
+	it("folds a partition column repeated in the ordinary DDL column list", () => {
+		const result = parseDdlSchema(
+			"create table demo.orders (id bigint, busi_date string) partitioned by (busi_date string) stored as orc",
+		);
+
+		expect(result.columns.map((column) => column.name)).toEqual(["id", "busi_date"]);
+		expect(result.partition_columns).toEqual(["busi_date"]);
+		expect(result.warnings).toEqual(["duplicate column names were folded"]);
+	});
+
 	it("ignores table constraints and indexes", () => {
 		const result = parseDdlSchema(
 			'CREATE TABLE "DEMO"."ORDERS" ("ID" NUMBER(10,0), "NAME" VARCHAR2(50), PRIMARY KEY ("ID"), CONSTRAINT "UQ_NAME" UNIQUE ("NAME")); CREATE INDEX "IDX_NAME" ON "DEMO"."ORDERS" ("NAME")',

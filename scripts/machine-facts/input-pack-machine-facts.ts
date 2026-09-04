@@ -29,6 +29,9 @@ import {
   type SqlSlot,
   type TableEvidence,
   type TableDocument,
+  type TaskPartitionAssignment,
+  type TaskPartitionEvidence,
+  type TaskPartitionEvidenceRef,
   type TaskDocument,
 } from "../input/shared/input-pack.ts";
 import { buildTaskPartitionEvidence } from "../input/shared/task-partition-evidence.ts";
@@ -43,6 +46,7 @@ import {
   type GenericAnalysisProfile,
   type GenericTaskProfile,
   type InputPackProvenance,
+  type PlatformPartitionAssignment,
   type PlatformTargetQueryOutput,
   type SqlWritePartitionEvidence,
 } from "./machine-facts-contract.ts";
@@ -492,13 +496,42 @@ function partitionStatus(
       const record = asRecord(variant);
       return (
         record !== null &&
-        columns.every((column) => nonEmpty(record[column]) !== null)
+        columns.every((column) => partitionFieldValue(record, column) !== null)
       );
     });
   return {
     partition_status: complete ? "COMPLETE" : "INCOMPLETE",
     partition_columns: columns,
   };
+}
+
+function partitionFieldValue(record: JsonRecord, field: string): string | null {
+  const key = Object.keys(record).find(
+    (candidate) => normalizeName(candidate) === normalizeName(field),
+  );
+  return key === undefined ? null : nonEmpty(record[key]);
+}
+
+function platformTargetResolutionMethod(
+  task: TaskDocument & JsonRecord,
+): PlatformTargetQueryOutput["target_resolution_method"] | null {
+  if (task.targetEvidenceKind === "DIRECT_PLATFORM_TARGET")
+    return "DIRECT_PLATFORM_TARGET";
+  if (
+    task.targetEvidenceKind === undefined &&
+    String(task.taskCategory).trim().toLowerCase() === "sparkindex"
+  ) {
+    return "SPARKINDEX_TASK_TARGET";
+  }
+  return null;
+}
+
+function queryOutputBindingContract(
+  task: TaskDocument & JsonRecord,
+): NonNullable<PlatformTargetQueryOutput["query_output_binding_contract"]> {
+  return String(task.taskCategory).trim().toLowerCase() === "sparkindex"
+    ? "SPARKINDEX_FULL_WIDTH_POSITIONAL"
+    : "PLATFORM_TARGET_SCHEMA_POSITIONAL";
 }
 
 function sameTableReference(left: string, right: string): boolean {
@@ -511,15 +544,17 @@ function sameTableReference(left: string, right: string): boolean {
   );
 }
 
-function sqlWritePartitionEvidence(
-  dataRoot: string,
+function partitionEvidenceRef(item: TaskPartitionEvidenceRef): string {
+  return `${item.source}:${item.locator}${item.detail ? `#${item.detail}` : ""}`;
+}
+
+function taskPartitionEvidence(
   task: TaskDocument & JsonRecord,
   taskTarget: PhysicalTableCatalogEntry,
-  catalog: PhysicalTableCatalog,
   schemaEntries: readonly PhysicalTableCatalogEntry[],
   sources: readonly SelectedLineageSql[],
   ddlCache?: Map<string, string>,
-): readonly SqlWritePartitionEvidence[] {
+): TaskPartitionEvidence {
   const tables: TableEvidence[] = schemaEntries.map((entry) => ({
     platform: entry.platform,
     dataSource: entry.dataSource,
@@ -540,12 +575,177 @@ function sqlWritePartitionEvidence(
   const sql = Object.fromEntries(
     sources.map((source) => [source.slot, source.content]),
   ) as Partial<Record<SqlSlot, string>>;
-  const evidence = buildTaskPartitionEvidence({
+  return buildTaskPartitionEvidence({
     taskTarget: taskTarget.qualifiedName,
     tables,
     sql,
-    sparkIndexMode: String(task.taskCategory).toLowerCase() === "sparkindex",
+    sparkIndexMode:
+      String(task.taskCategory).trim().toLowerCase() === "sparkindex",
   });
+}
+
+function packPartitionValues(
+  task: TaskDocument & JsonRecord,
+  field: string,
+): readonly string[] | null {
+  if (task.partition === null || task.partition === undefined) return null;
+  const variants = Array.isArray(task.partition)
+    ? task.partition
+    : [task.partition];
+  const values = variants.map((variant) => {
+    const record = asRecord(variant);
+    return record === null ? null : partitionFieldValue(record, field);
+  });
+  return values.length === 0 || values.some((value) => value === null)
+    ? null
+    : (values as string[]);
+}
+
+function runtimePartitionValue(value: string): boolean {
+  return value === "*" || /\$\{|\{\{|\{%|<%/u.test(value);
+}
+
+function packPartitionAssignmentStatus(
+  task: TaskDocument & JsonRecord,
+  field: string,
+): PlatformPartitionAssignment["status"] {
+  if (task.partition === null) return "CONFLICT";
+  const values = packPartitionValues(task, field);
+  if (values === null) return "UNKNOWN";
+  return values.some(runtimePartitionValue)
+    ? "RUNTIME_EXPRESSION"
+    : "CONFIRMED";
+}
+
+function sourceAssignmentsForField(
+  write: TaskPartitionEvidence["targets"][number]["writes"][number],
+  field: string,
+): readonly TaskPartitionAssignment[] {
+  const key = normalizeName(field);
+  const candidates = [
+    write.assignments.find(
+      (assignment) => normalizeName(assignment.field) === key,
+    ),
+    ...(write.assignmentVariants ?? []).map((variant) =>
+      variant.find((assignment) => normalizeName(assignment.field) === key),
+    ),
+  ].filter(
+    (assignment): assignment is TaskPartitionAssignment =>
+      assignment !== undefined,
+  );
+  const seen = new Set<string>();
+  return candidates.filter((assignment) => {
+    const signature = `${assignment.status}\u0000${assignment.value ?? ""}\u0000${assignment.expression ?? ""}`;
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+}
+
+function partitionLiteralConflict(
+  task: TaskDocument & JsonRecord,
+  field: string,
+  sources: readonly TaskPartitionAssignment[],
+): boolean {
+  if (sources.some((assignment) => assignment.status === "CONFLICT"))
+    return true;
+  const packValues = packPartitionValues(task, field);
+  if (packValues === null || packValues.some(runtimePartitionValue))
+    return false;
+  if (
+    sources.length === 0 ||
+    sources.some(
+      (assignment) =>
+        assignment.status !== "CONFIRMED" || assignment.value === null,
+    )
+  )
+    return false;
+  const expected = [...new Set(packValues.map((value) => value.trim()))].sort(
+    compareText,
+  );
+  const observed = [
+    ...new Set(sources.map((assignment) => assignment.value!.trim())),
+  ].sort(compareText);
+  return (
+    expected.length !== observed.length ||
+    expected.some((value, index) => value !== observed[index])
+  );
+}
+
+function platformPartitionBinding(
+  task: TaskDocument & JsonRecord,
+  evidence: TaskPartitionEvidence,
+  target: PhysicalTableCatalogEntry,
+): Pick<PlatformTargetQueryOutput, "partition_mode" | "partition_assignments"> {
+  const targets = evidence.targets.filter((candidate) =>
+    sameTableReference(candidate.target, target.qualifiedName),
+  );
+  if (targets.length !== 1) {
+    return {
+      partition_mode: "UNKNOWN",
+      partition_assignments: [],
+    };
+  }
+  const directWrites = targets[0]!.writes.filter(
+    (write) => write.statementOrdinal === null,
+  );
+  if (directWrites.length !== 1) {
+    return {
+      partition_mode: "UNKNOWN",
+      partition_assignments: [],
+    };
+  }
+  const write = directWrites[0]!;
+  const assignments: PlatformPartitionAssignment[] =
+    write.mode === "DYNAMIC"
+      ? targets[0]!.fields.map((field) => {
+          const sources = sourceAssignmentsForField(write, field);
+          const conflict = partitionLiteralConflict(task, field, sources);
+          return {
+            field: normalizeName(field),
+            status: conflict
+              ? ("CONFLICT" as const)
+              : packPartitionAssignmentStatus(task, field),
+            mapping_method: conflict
+              ? ("CONFLICT" as const)
+              : ("DYNAMIC_PARTITION_OUTPUT_ORDINAL" as const),
+            evidence_refs: [
+              ...new Set([
+                ...write.evidence.map(partitionEvidenceRef),
+                ...sources.flatMap((source) =>
+                  source.evidence.map(partitionEvidenceRef),
+                ),
+                `TASK_PACK:task.partition#field=${normalizeName(field)}`,
+              ]),
+            ].sort(compareText),
+            ...(conflict
+              ? { reason: "PACK_SQL_PARTITION_LITERAL_CONFLICT" }
+              : {}),
+          };
+        })
+      : write.assignments.map((assignment) => ({
+          field: normalizeName(assignment.field),
+          status: assignment.status,
+          mapping_method: assignment.mappingMethod,
+          evidence_refs: [
+            ...new Set(assignment.evidence.map(partitionEvidenceRef)),
+          ].sort(compareText),
+          ...(assignment.reason === undefined
+            ? {}
+            : { reason: assignment.reason }),
+        }));
+  return {
+    partition_mode: write.mode,
+    partition_assignments: assignments,
+  };
+}
+
+function sqlWritePartitionEvidence(
+  dataRoot: string,
+  catalog: PhysicalTableCatalog,
+  sources: readonly SelectedLineageSql[],
+  evidence: TaskPartitionEvidence,
+): readonly SqlWritePartitionEvidence[] {
   return evidence.targets
     .filter((target) => target.writes.length > 0)
     .flatMap((target) => {
@@ -965,11 +1165,38 @@ export function prepareInputPackTask(
     ddl_locator: relativeLocator(dataRoot, target.ddlPath),
     ddl_sha256: target.ddlSha256,
   };
+  const declaredPartition = partitionStatus(task, target);
+  const detailedPartition = taskPartitionEvidence(
+    task,
+    target,
+    schemaEntries,
+    selected.sources,
+    options.ddlCache,
+  );
+  const platformPartition = taskPartitionEvidence(
+    task,
+    target,
+    schemaEntries,
+    selected.sources.filter((source) => source.slot === selected.selected.slot),
+    options.ddlCache,
+  );
+  const targetResolutionMethod = platformTargetResolutionMethod(task);
+  const outputBindingContract = queryOutputBindingContract(task);
+  const platformPartitionShape =
+    outputBindingContract === "SPARKINDEX_FULL_WIDTH_POSITIONAL"
+      ? platformPartitionBinding(task, platformPartition, target)
+      : target.partitionFields?.length === 0
+        ? { partition_mode: "NONE" as const, partition_assignments: [] }
+        : { partition_mode: "UNKNOWN" as const, partition_assignments: [] };
   const platformOutput =
-    task.targetEvidenceKind === "DIRECT_PLATFORM_TARGET"
+    targetResolutionMethod !== null
       ? ({
           target: target.qualifiedName,
-          ...partitionStatus(task, target),
+          target_resolution_method: targetResolutionMethod,
+          query_output_slot: selected.selected.slot,
+          query_output_binding_contract: outputBindingContract,
+          ...declaredPartition,
+          ...platformPartitionShape,
           evidence_refs: [
             provenance.task_locator,
             provenance.table_locator,
@@ -979,12 +1206,9 @@ export function prepareInputPackTask(
       : undefined;
   const explicitWritePartitionEvidence = sqlWritePartitionEvidence(
     dataRoot,
-    task,
-    target,
     catalog,
-    schemaEntries,
-    combined.sources,
-    options.ddlCache,
+    selected.sources,
+    detailedPartition,
   );
   const profileTask: GenericTaskProfile = {
     task_id: options.taskId,
@@ -995,8 +1219,8 @@ export function prepareInputPackTask(
       : { sql_segments: combined.segments }),
     input_pack_provenance: provenance,
     write_partition_evidence: {
-      status: partitionStatus(task, target).partition_status,
-      partition_columns: partitionStatus(task, target).partition_columns,
+      status: declaredPartition.partition_status,
+      partition_columns: declaredPartition.partition_columns,
       evidence_refs: [
         provenance.task_locator,
         provenance.table_locator,

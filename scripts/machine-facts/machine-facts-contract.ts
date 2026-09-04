@@ -1,6 +1,6 @@
 export const MACHINE_FACTS_CONTRACT_VERSION = "1.3.0";
 export const MACHINE_FACTS_STATUS_VERSION = "1.0.0";
-export const MACHINE_FACTS_ADAPTER_VERSION = "1.3.7";
+export const MACHINE_FACTS_ADAPTER_VERSION = "1.3.8";
 
 /** Canonical evidence kind for a Pack-declared query output write. */
 export const PACK_DECLARED_QUERY_OUTPUT = "PACK_DECLARED_QUERY_OUTPUT" as const;
@@ -162,6 +162,15 @@ export interface DatasetIoRecord {
   readonly write_statement_id?: string;
   readonly query_producer_statement_id?: string | null;
   readonly source_sql_sha256?: string;
+  readonly target_resolution_method?: PlatformTargetQueryOutput["target_resolution_method"];
+  readonly query_output_binding_contract?: QueryOutputBindingContract;
+  readonly partition_status?: PlatformTargetQueryOutput["partition_status"];
+  readonly partition_binding_status?: PartitionBindingStatus;
+  readonly partition_mode?: PartitionBindingMode;
+  readonly partition_columns?: readonly string[];
+  readonly partition_assignments?: readonly PlatformPartitionAssignment[];
+  readonly static_partition_columns?: readonly string[];
+  readonly dynamic_partition_columns?: readonly string[];
   readonly read_occurrences?: readonly unknown[];
   readonly [key: string]: unknown;
 }
@@ -355,6 +364,7 @@ export interface OutputFieldBindingRecord {
   readonly target_schema_status:
     "MATCH" | "DRIFT_EXTRA_TARGET_COLUMNS" | "NOT_AVAILABLE";
   readonly static_partition_columns: readonly string[];
+  readonly dynamic_partition_columns?: readonly string[];
   readonly evidence_refs: readonly string[];
   readonly evidence_kind?: OutputEvidenceKind;
   readonly source_sql_sha256?: string;
@@ -439,11 +449,37 @@ export interface InputPackProvenance {
   readonly ddl_sha256: string;
 }
 
+export type PartitionBindingMode =
+  "STATIC" | "DYNAMIC" | "MIXED" | "NONE" | "UNKNOWN";
+export type PartitionBindingStatus =
+  "NOT_PARTITIONED" | "COMPLETE" | "INCOMPLETE" | "UNKNOWN" | "CONFLICT";
+export type QueryOutputBindingContract =
+  "SPARKINDEX_FULL_WIDTH_POSITIONAL" | "PLATFORM_TARGET_SCHEMA_POSITIONAL";
+
+export interface PlatformPartitionAssignment {
+  readonly field: string;
+  readonly status: "CONFIRMED" | "RUNTIME_EXPRESSION" | "UNKNOWN" | "CONFLICT";
+  readonly mapping_method:
+    | "STATIC_SQL_ASSIGNMENT"
+    | "DYNAMIC_PARTITION_OUTPUT_ORDINAL"
+    | "SCHEDULER_EXPLICIT_FIELD_VALUE"
+    | "UNKNOWN"
+    | "CONFLICT";
+  readonly evidence_refs: readonly string[];
+  readonly reason?: string;
+}
+
 export interface PlatformTargetQueryOutput {
   readonly target: string;
+  readonly target_resolution_method?:
+    "DIRECT_PLATFORM_TARGET" | "SPARKINDEX_TASK_TARGET";
+  readonly query_output_slot?: string;
+  readonly query_output_binding_contract?: QueryOutputBindingContract;
   readonly partition_status:
     "NOT_PARTITIONED" | "COMPLETE" | "INCOMPLETE" | "UNKNOWN" | "CONFLICT";
   readonly partition_columns: readonly string[];
+  readonly partition_mode?: PartitionBindingMode;
+  readonly partition_assignments?: readonly PlatformPartitionAssignment[];
   readonly evidence_refs: readonly string[];
 }
 
