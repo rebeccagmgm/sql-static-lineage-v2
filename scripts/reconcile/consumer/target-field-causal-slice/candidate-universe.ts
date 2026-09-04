@@ -1,7 +1,7 @@
+import { canonicalMachineFactsJson as canonicalJson } from "../../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 import {
-  canonicalJson,
   normalizeName,
-  sha256,
   type JsonValue,
 } from "../../../machine-facts/machine-facts-contract.ts";
 import type { RootCriterion } from "./write-scoped-plan-inputs.ts";
@@ -27,8 +27,7 @@ export const CANDIDATE_BRANCH_KINDS = [
 export type CandidateBranchKind = (typeof CANDIDATE_BRANCH_KINDS)[number];
 
 export type CandidateUniverseStatus =
-  | "COMPLETE_OBSERVED_EVIDENCE"
-  | "INCOMPLETE";
+  "COMPLETE_OBSERVED_EVIDENCE" | "INCOMPLETE";
 
 export interface CandidateReadOccurrence {
   readonly occurrenceId: string;
@@ -65,7 +64,8 @@ export interface CandidateEvidenceRef {
 /** Read-only continuation evidence attached by the union-v2 consumer path. */
 export interface CandidateContinuation {
   readonly source: "IN_UNION_FINAL_WRITE" | "PRODUCER_INDEX_ONLY";
-  readonly partitionMatchStatus: "CONFIRMED" | "ASSUMED" | "UNKNOWN" | "DISJOINT";
+  readonly partitionMatchStatus:
+    "CONFIRMED" | "ASSUMED" | "UNKNOWN" | "DISJOINT";
   readonly evidenceLayer: "L1" | "L2";
   readonly l1Eligible: boolean;
   readonly indexEntryRef: string;
@@ -191,12 +191,18 @@ function occurrenceOf(value: unknown): CandidateReadOccurrence | null {
   if (!source) return null;
   const occurrenceId = text(source.occurrenceId);
   const readRelationId = text(source.readRelationId);
-  const sqlSourceId = text(source.sqlSourceId) ?? text(source.sql_source_id) ??
-    text(source.statementId) ?? text(source.statement_id);
+  const sqlSourceId =
+    text(source.sqlSourceId) ??
+    text(source.sql_source_id) ??
+    text(source.statementId) ??
+    text(source.statement_id);
   const statementIndex = integer(source.statementIndex);
-  const rootRelationId = text(source.rootRelationId) ?? text(source.root_relation_id);
+  const rootRelationId =
+    text(source.rootRelationId) ?? text(source.root_relation_id);
   const relationPath = Array.isArray(source.relationPath)
-    ? source.relationPath.filter((item): item is string => typeof item === "string")
+    ? source.relationPath.filter(
+        (item): item is string => typeof item === "string",
+      )
     : [];
   if (
     occurrenceId === null ||
@@ -226,14 +232,18 @@ function canonicalSqlSourceId(value: string): string {
   return query?.[1] ?? normalized;
 }
 
-function occurrenceIdentity(occurrence: CandidateReadOccurrence | null): JsonValue {
+function occurrenceIdentity(
+  occurrence: CandidateReadOccurrence | null,
+): JsonValue {
   if (!occurrence) return null;
   return {
     occurrenceId: occurrence.occurrenceId,
     readRelationId: occurrence.readRelationId,
     sqlSourceId: occurrence.sqlSourceId ?? null,
     statementIndex: occurrence.statementIndex,
-    ...(occurrence.rootRelationId ? { rootRelationId: occurrence.rootRelationId } : {}),
+    ...(occurrence.rootRelationId
+      ? { rootRelationId: occurrence.rootRelationId }
+      : {}),
     relationPath: [...occurrence.relationPath],
   };
 }
@@ -257,11 +267,7 @@ function writeEvidenceRefs(value: unknown): readonly CandidateEvidenceRef[] {
   return records(value).flatMap((write) => evidenceRefsOf(write.evidence));
 }
 
-function gapId(
-  rootTaskId: string,
-  kind: string,
-  identity: JsonValue,
-): string {
+function gapId(rootTaskId: string, kind: string, identity: JsonValue): string {
   return `candidate-gap:${rootTaskId}:${kind}:${sha256(canonicalJson(identity))}`;
 }
 
@@ -296,31 +302,31 @@ function branchIdentity(input: {
 }
 
 export function canonicalCandidateBranchId(
-	branch: Pick<
-		CandidateBranch,
-		| "rootTaskId"
-		| "branchKind"
-		| "consumerTaskId"
-		| "producerTaskId"
-		| "table"
-		| "readOccurrence"
-		| "writeObservationId"
-		| "boundaryReason"
-	>,
+  branch: Pick<
+    CandidateBranch,
+    | "rootTaskId"
+    | "branchKind"
+    | "consumerTaskId"
+    | "producerTaskId"
+    | "table"
+    | "readOccurrence"
+    | "writeObservationId"
+    | "boundaryReason"
+  >,
 ): string {
-	return branchId(
-		branch.rootTaskId,
-		branch.branchKind,
-		branchIdentity({
-			branchKind: branch.branchKind,
-			consumerTaskId: branch.consumerTaskId,
-			producerTaskId: branch.producerTaskId,
-			table: branch.table,
-			readOccurrence: branch.readOccurrence,
-			writeObservationId: branch.writeObservationId ?? null,
-			boundaryReason: branch.boundaryReason,
-		}),
-	);
+  return branchId(
+    branch.rootTaskId,
+    branch.branchKind,
+    branchIdentity({
+      branchKind: branch.branchKind,
+      consumerTaskId: branch.consumerTaskId,
+      producerTaskId: branch.producerTaskId,
+      table: branch.table,
+      readOccurrence: branch.readOccurrence,
+      writeObservationId: branch.writeObservationId ?? null,
+      boundaryReason: branch.boundaryReason,
+    }),
+  );
 }
 
 function makeBranch(input: {
@@ -342,15 +348,16 @@ function makeBranch(input: {
   const consumerTaskId = input.consumerTaskId ?? null;
   const producerTaskId = input.producerTaskId ?? null;
   const sourceTable = input.table ?? null;
-  const table = sourceTable === null
-    ? null
-    : input.resolvePhysicalTable?.(sourceTable) ?? sourceTable;
+  const table =
+    sourceTable === null
+      ? null
+      : (input.resolvePhysicalTable?.(sourceTable) ?? sourceTable);
   const readOccurrence = input.readOccurrence ?? null;
   const writeObservationId = input.writeObservationId ?? null;
   const boundaryReason = input.boundaryReason ?? null;
-	const branchInput = {
-		branchKind: input.branchKind,
-		rootTaskId: input.rootTaskId,
+  const branchInput = {
+    branchKind: input.branchKind,
+    rootTaskId: input.rootTaskId,
     consumerTaskId,
     producerTaskId,
     table,
@@ -360,13 +367,13 @@ function makeBranch(input: {
     evidenceRefs: [...(input.evidenceRefs ?? [])].sort((a, b) =>
       a.evidenceRefId.localeCompare(b.evidenceRefId),
     ),
-		gapRefs: sortedUnique(input.gapRefs ?? []),
-		boundaryReason,
-	};
-	return {
-		candidateBranchId: canonicalCandidateBranchId(branchInput),
-		...branchInput,
-	};
+    gapRefs: sortedUnique(input.gapRefs ?? []),
+    boundaryReason,
+  };
+  return {
+    candidateBranchId: canonicalCandidateBranchId(branchInput),
+    ...branchInput,
+  };
 }
 
 function readKey(
@@ -395,8 +402,10 @@ function bridgeMatchesRead(
   if (readOccurrence === null) return true;
   const bridgeOccurrence = occurrenceOf(bridge.readOccurrence);
   if (bridgeOccurrence === null) return false;
-  return canonicalJson(occurrenceIdentity(bridgeOccurrence)) ===
-    canonicalJson(occurrenceIdentity(readOccurrence));
+  return (
+    canonicalJson(occurrenceIdentity(bridgeOccurrence)) ===
+    canonicalJson(occurrenceIdentity(readOccurrence))
+  );
 }
 
 function readIsBlocked(read: JsonRecord): boolean {
@@ -427,7 +436,10 @@ function boundaryTerminalReason(value: unknown): string | null {
   return null;
 }
 
-function isCheckdbflagProducer(artifact: JsonRecord, producerTaskId: string): boolean {
+function isCheckdbflagProducer(
+  artifact: JsonRecord,
+  producerTaskId: string,
+): boolean {
   return records(artifact.taskNodes).some((node) => {
     if (text(node.taskId) !== producerTaskId) return false;
     return isCheckdbflagTask({
@@ -442,10 +454,14 @@ function sourceArtifactType(artifact: JsonRecord): string {
   return text(artifact.artifactType) ?? "TABLE_MULTI_HOP_RECONCILIATION";
 }
 
-function rootTableForCriterion(criterion: RootCriterion): CandidatePhysicalTable {
+function rootTableForCriterion(
+  criterion: RootCriterion,
+): CandidatePhysicalTable {
   const parts = criterion.rootTargetFieldId.split("|");
   if (parts.length < 5)
-    throw new Error(`ROOT_CRITERION_PHYSICAL_FIELD_INVALID:${criterion.rootCriterionId}`);
+    throw new Error(
+      `ROOT_CRITERION_PHYSICAL_FIELD_INVALID:${criterion.rootCriterionId}`,
+    );
   const [platform, dataSource, stableTableId, qualifiedName] = parts;
   const targetKey = criterion.targetTableKey.split("|");
   if (
@@ -455,7 +471,9 @@ function rootTableForCriterion(criterion: RootCriterion): CandidatePhysicalTable
         normalizeName(value ?? "") !== normalizeName(targetKey[index] ?? ""),
     )
   )
-    throw new Error(`ROOT_CRITERION_TARGET_TABLE_MISMATCH:${criterion.rootCriterionId}`);
+    throw new Error(
+      `ROOT_CRITERION_TARGET_TABLE_MISMATCH:${criterion.rootCriterionId}`,
+    );
   return {
     platform: platform!,
     dataSource: dataSource!,
@@ -508,7 +526,9 @@ export function projectCandidateUniverse(
       producerRole: current.producerRole ?? candidate.producerRole,
       evidenceRefs: [...current.evidenceRefs, ...candidate.evidenceRefs].filter(
         (item, index, all) =>
-          all.findIndex((other) => other.evidenceRefId === item.evidenceRefId) === index,
+          all.findIndex(
+            (other) => other.evidenceRefId === item.evidenceRefId,
+          ) === index,
       ),
       gapRefs: sortedUnique([...current.gapRefs, ...candidate.gapRefs]),
     });
@@ -519,55 +539,68 @@ export function projectCandidateUniverse(
     (edge) => text(edge.producerTaskId) === rootTaskId,
   );
   const rootCriteria = input.rootCriteria ?? [];
-  const selectedWriteObservationIds = sortedUnique(input.rootWriteObservationIds ?? []);
+  const selectedWriteObservationIds = sortedUnique(
+    input.rootWriteObservationIds ?? [],
+  );
   if (rootCriteria.length > 0) {
     for (const criterion of rootCriteria) {
       if (criterion.rootTaskId !== rootTaskId)
-        throw new Error(`ROOT_CRITERION_TASK_MISMATCH:${criterion.rootCriterionId}`);
+        throw new Error(
+          `ROOT_CRITERION_TASK_MISMATCH:${criterion.rootCriterionId}`,
+        );
       const criterionTable = rootTableForCriterion(criterion);
       const matchingWrites = rootWrites.filter((write) => {
         const sourceTable = tableOf(write.table);
-        const resolvedTable = sourceTable === null
-          ? null
-          : input.resolvePhysicalTable?.(sourceTable) ?? sourceTable;
+        const resolvedTable =
+          sourceTable === null
+            ? null
+            : (input.resolvePhysicalTable?.(sourceTable) ?? sourceTable);
         return samePhysicalTable(resolvedTable, criterionTable);
       });
       const matchedTable = tableOf(matchingWrites[0]?.table);
-      add(makeBranch({
-        rootTaskId,
-        branchKind: "ROOT_WRITE",
-        producerTaskId: rootTaskId,
-        table: matchedTable ?? criterionTable,
-        evidenceRefs: matchingWrites.flatMap((write) => writeEvidenceRefs(write.writes)),
-        writeObservationId: criterion.rootWriteObservationId,
-        resolvePhysicalTable: input.resolvePhysicalTable,
-      }));
+      add(
+        makeBranch({
+          rootTaskId,
+          branchKind: "ROOT_WRITE",
+          producerTaskId: rootTaskId,
+          table: matchedTable ?? criterionTable,
+          evidenceRefs: matchingWrites.flatMap((write) =>
+            writeEvidenceRefs(write.writes),
+          ),
+          writeObservationId: criterion.rootWriteObservationId,
+          resolvePhysicalTable: input.resolvePhysicalTable,
+        }),
+      );
     }
   } else if (rootWrites.length === 0) {
     for (const writeObservationId of selectedWriteObservationIds.length > 0
       ? selectedWriteObservationIds
       : [null])
-      add(makeBranch({
-        rootTaskId,
-        branchKind: "ROOT_WRITE",
-        producerTaskId: rootTaskId,
-        writeObservationId,
-        resolvePhysicalTable: input.resolvePhysicalTable,
-      }));
+      add(
+        makeBranch({
+          rootTaskId,
+          branchKind: "ROOT_WRITE",
+          producerTaskId: rootTaskId,
+          writeObservationId,
+          resolvePhysicalTable: input.resolvePhysicalTable,
+        }),
+      );
   } else {
     for (const write of rootWrites)
       for (const writeObservationId of selectedWriteObservationIds.length > 0
         ? selectedWriteObservationIds
         : [null])
-        add(makeBranch({
-          rootTaskId,
-          branchKind: "ROOT_WRITE",
-          producerTaskId: rootTaskId,
-        table: tableOf(write.table),
-        evidenceRefs: writeEvidenceRefs(write.writes),
-        writeObservationId,
-        resolvePhysicalTable: input.resolvePhysicalTable,
-      }));
+        add(
+          makeBranch({
+            rootTaskId,
+            branchKind: "ROOT_WRITE",
+            producerTaskId: rootTaskId,
+            table: tableOf(write.table),
+            evidenceRefs: writeEvidenceRefs(write.writes),
+            writeObservationId,
+            resolvePhysicalTable: input.resolvePhysicalTable,
+          }),
+        );
   }
 
   const producerBridges = records(artifact.producerBridges);
@@ -577,7 +610,14 @@ export function projectCandidateUniverse(
     if (consumerTaskId === null || producerTaskId === null) continue;
     const bridgeTable = tableOf(bridge.table);
     if (!bridgeTable) continue;
-    if (isSameTaskScratchProducerBridge(consumerTaskId, producerTaskId, bridgeTable.qualifiedName)) continue;
+    if (
+      isSameTaskScratchProducerBridge(
+        consumerTaskId,
+        producerTaskId,
+        bridgeTable.qualifiedName,
+      )
+    )
+      continue;
     add(
       makeBranch({
         rootTaskId,
@@ -596,7 +636,10 @@ export function projectCandidateUniverse(
   const physicalPairs = new Set(
     [...branches.values()]
       .filter((branch) => branch.branchKind === "PHYSICAL_PRODUCER")
-      .map((branch) => `${branch.consumerTaskId ?? ""}\0${branch.producerTaskId ?? ""}`),
+      .map(
+        (branch) =>
+          `${branch.consumerTaskId ?? ""}\0${branch.producerTaskId ?? ""}`,
+      ),
   );
   for (const edge of scheduleEdges) {
     const consumerTaskId = text(edge.consumerTaskId);
@@ -624,7 +667,11 @@ export function projectCandidateUniverse(
     if (consumerTaskId === null) continue;
     const table = tableOf(read.table);
     if (!table || isOutOfScopePhysicalRead(table)) continue;
-    if (consumerTaskId === rootTaskId && isSameTaskScratchTable(table.qualifiedName)) continue;
+    if (
+      consumerTaskId === rootTaskId &&
+      isSameTaskScratchTable(table.qualifiedName)
+    )
+      continue;
     const occurrence = occurrenceOf(read.readOccurrence);
     const matchingBridge = producerBridges.some((bridge) =>
       bridgeMatchesRead(bridge, read, table),
@@ -632,16 +679,12 @@ export function projectCandidateUniverse(
     if (matchingBridge) continue;
     const blocked = readIsBlocked(read);
     const kind: CandidateBranchKind = blocked ? "BLOCKED_READ" : "UNBOUND_READ";
-    const gap = gapId(
-      rootTaskId,
-      kind,
-      {
-        consumerTaskId,
-        table: tableIdentity(table),
-        occurrence: occurrenceIdentity(occurrence),
-        blockReasons: records(read.blockReasons),
-      } as unknown as JsonValue,
-    );
+    const gap = gapId(rootTaskId, kind, {
+      consumerTaskId,
+      table: tableIdentity(table),
+      occurrence: occurrenceIdentity(occurrence),
+      blockReasons: records(read.blockReasons),
+    } as unknown as JsonValue);
     if (blocked) blockedReadGapRefs.push(gap);
     else unboundReadGapRefs.push(gap);
     add(
@@ -653,7 +696,9 @@ export function projectCandidateUniverse(
         readOccurrence: occurrence,
         evidenceRefs: evidenceRefsOf(read.evidence),
         gapRefs: [gap],
-        boundaryReason: blocked ? "READ_EVIDENCE_BLOCKED" : "PRODUCER_NOT_OBSERVED",
+        boundaryReason: blocked
+          ? "READ_EVIDENCE_BLOCKED"
+          : "PRODUCER_NOT_OBSERVED",
         resolvePhysicalTable: input.resolvePhysicalTable,
       }),
     );
@@ -673,7 +718,11 @@ export function projectCandidateUniverse(
     );
   if (sourceLimitsTruncated)
     boundaryGapRefs.push(
-      gapId(rootTaskId, "LIMIT_TRUNCATED", text(limits?.truncationReason) ?? "UNKNOWN"),
+      gapId(
+        rootTaskId,
+        "LIMIT_TRUNCATED",
+        text(limits?.truncationReason) ?? "UNKNOWN",
+      ),
     );
 
   for (const terminal of records(artifact.terminals)) {
@@ -682,16 +731,12 @@ export function projectCandidateUniverse(
     if (isOutOfScopeTerminalReason(terminal.reason)) continue;
     const terminalTable = tableOf(terminal.table);
     if (isOutOfScopePhysicalRead(terminalTable)) continue;
-    const terminalGap = gapId(
-      rootTaskId,
-      "TERMINAL",
-      {
-        taskId: text(terminal.taskId),
-        depth: integer(terminal.depth),
-        reason,
-        table: tableIdentity(terminalTable),
-      } as unknown as JsonValue,
-    );
+    const terminalGap = gapId(rootTaskId, "TERMINAL", {
+      taskId: text(terminal.taskId),
+      depth: integer(terminal.depth),
+      reason,
+      table: tableIdentity(terminalTable),
+    } as unknown as JsonValue);
     boundaryGapRefs.push(terminalGap);
     add(
       makeBranch({
@@ -723,7 +768,10 @@ export function projectCandidateUniverse(
   );
   return {
     rootTaskId,
-    status: uniqueBoundaryGapRefs.length === 0 ? "COMPLETE_OBSERVED_EVIDENCE" : "INCOMPLETE",
+    status:
+      uniqueBoundaryGapRefs.length === 0
+        ? "COMPLETE_OBSERVED_EVIDENCE"
+        : "INCOMPLETE",
     branches: orderedBranches,
     boundaryGapRefs: uniqueBoundaryGapRefs,
     coverage: {

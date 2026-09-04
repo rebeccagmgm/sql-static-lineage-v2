@@ -9,10 +9,8 @@ import {
 import { randomUUID } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
 
-import {
-  canonicalJson,
-  sha256,
-} from "../../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 
 export const DEFAULT_SCHEDULE_EVIDENCE_CACHE_ROOT =
   "E:\\02_area\\股衍数据-数据cookbook\\sql-static-lineage-cache";
@@ -471,7 +469,9 @@ export function writeTaskPartitionBindingsCache(
   try {
     writeFileSync(
       temporaryPath,
-      canonicalJson(partitionBindingsCacheDocument(taskId, observedAt, bindings)),
+      canonicalJson(
+        partitionBindingsCacheDocument(taskId, observedAt, bindings),
+      ),
       { encoding: "utf8", flag: "wx" },
     );
     renameSync(temporaryPath, path);

@@ -7,10 +7,8 @@ import {
   loadPhysicalTableCatalog,
   type PhysicalTableCatalogEntry,
 } from "../../../machine-facts/input-pack-machine-facts.ts";
-import {
-  canonicalJson,
-  sha256,
-} from "../../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 import {
   canonicalBundleIdentity,
   createCurrentTaskBundleReader,

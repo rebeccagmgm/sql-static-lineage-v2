@@ -15,9 +15,9 @@ import {
   sep,
 } from "node:path";
 import { SqlSession, type Dialect } from "sqllens";
+import { sha256File } from "../../../../src/adapters/files/sha256-file.js";
+import { sha256Hex } from "../../../../src/contracts/sha256.js";
 import {
-  sha256Bytes,
-  sha256File,
   validateTableDocument,
   validateTaskDocument,
   type TableDocument,
@@ -268,7 +268,7 @@ function fingerprintInputTree(dataRoot: string): string {
   visit(join(dataRoot, "tasks"));
   visit(join(dataRoot, "tables"));
   files.sort((left, right) => compareText(left.path, right.path));
-  return sha256Bytes(Buffer.from(JSON.stringify(files), "utf8"));
+  return sha256Hex(Buffer.from(JSON.stringify(files), "utf8"));
 }
 
 function taskPackEvidence(
@@ -330,7 +330,7 @@ function loadTaskPack(
         throw new Error("SQL_FILE_PATH_ESCAPE");
       const expectedHash = String(file.sha256);
       const sqlBytes = readFileSync(absolutePath);
-      if (sha256Bytes(sqlBytes) !== expectedHash)
+      if (sha256Hex(sqlBytes) !== expectedHash)
         throw new Error(`SQL_FILE_HASH_MISMATCH:${slot}`);
       sqlFiles.push({
         slot,
@@ -435,7 +435,7 @@ function loadTablePack(
       )
         throw new Error("DDL_FILE_PATH_ESCAPE");
       const ddlBytes = readFileSync(ddlPath);
-      if (sha256Bytes(ddlBytes) !== String(ddlFile.sha256))
+      if (sha256Hex(ddlBytes) !== String(ddlFile.sha256))
         throw new Error("DDL_FILE_HASH_MISMATCH");
     }
     const dataSource = normalizeToken(String(document.dataSource));

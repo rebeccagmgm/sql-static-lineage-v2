@@ -23,8 +23,8 @@ import {
   type Dialect,
   type SchemaMapping,
 } from "sqllens";
+import { sha256File } from "../../../../src/adapters/files/sha256-file.js";
 import {
-  sha256File,
   validateTableDocument,
   validateTaskDocument,
   type JsonValue,

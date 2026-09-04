@@ -5,31 +5,31 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
-  canonicalJson as canonicalInputPackJson,
-  sha256Text,
+  canonicalInputPackJson,
+  canonicalMachineFactsJson,
+} from "../../src/contracts/canonical-json.js";
+import {
+  causalTargetWriteId,
+  machineFactsDatasetId,
+  machineFactsFieldId,
+  physicalFieldKey,
+  platformTargetWriteObservationId,
+  sqlParsedWriteObservationId,
+  taskLocalPhysicalDatasetNodeId,
+  taskLocalPhysicalFieldNodeId,
+  taskLocalReadOccurrenceNodeId,
+  taskLocalTargetWriteNodeId,
+  taskNodeId,
+} from "../../src/contracts/identity.js";
+import { sha256Hex } from "../../src/contracts/sha256.js";
+import {
   writeTableInput,
   writeTaskInput,
 } from "../../scripts/input/shared/input-pack.ts";
-import {
-  canonicalJson as canonicalMachineFactsJson,
-  datasetId,
-  fieldId,
-  sha256,
-} from "../../scripts/machine-facts/machine-facts-contract.ts";
 import { runInputPackMachineFacts } from "../../scripts/machine-facts/input-pack-machine-facts.ts";
 import { readJsonlRecords } from "../../scripts/machine-facts/jsonl-store.ts";
-import {
-  fieldEvidencePhysicalFieldNodeId,
-  physicalDatasetNodeId,
-  readOccurrenceNodeId,
-  targetWriteNodeId,
-  taskNodeId,
-} from "../../scripts/project-graph/task-local/ids.ts";
 import { loadCurrentTaskBundle } from "../../scripts/query/current-task-bundle.ts";
-import {
-  physicalFieldKey,
-  type PhysicalFieldIdentity,
-} from "../../scripts/reconcile/consumer/field-lineage/field-lineage-contract.ts";
+import type { PhysicalFieldIdentity } from "../../scripts/reconcile/consumer/field-lineage/field-lineage-contract.ts";
 import { resolveTargetWrite } from "../../scripts/reconcile/consumer/target-table-upstream-causal-closure/target-write-contract.ts";
 
 const FIXED_TIME = "2026-09-05T00:00:00.000Z";
@@ -38,6 +38,8 @@ const PLATFORM_TASK_ID = "420";
 const EXPLICIT_TARGET = "demo.explicit_target";
 const PLATFORM_TARGET = "demo.platform_target";
 const SOURCE_TABLE = "demo.source";
+const EXPLICIT_WRITE_OBSERVATION_ID = "write-observation:410:0";
+const PLATFORM_WRITE_OBSERVATION_ID = "write-observation:420:platform-target:0";
 
 const INPUT_PACK_CANONICAL_WIRE =
   '{"a":1,"dataSource":"GFHIVE","datasetId":"数据集-A","nested":{"a":null,"z":true},"sql":"SQL: 血缘😀","tags":["b","a"]}';
@@ -150,7 +152,7 @@ describe("identity contract", () => {
       Buffer.from(INPUT_PACK_CANONICAL_WIRE, "utf8"),
     );
     expect(Buffer.byteLength(inputPackWire, "utf8")).toBe(125);
-    expect(sha256Text(inputPackWire)).toBe(
+    expect(sha256Hex(inputPackWire)).toBe(
       "b68f48efba311cf2736acc867743513daa8eddc54c50fd9c71c2d92e5ea5b2c0",
     );
 
@@ -160,13 +162,13 @@ describe("identity contract", () => {
       Buffer.from(MACHINE_FACTS_CANONICAL_WIRE, "utf8"),
     );
     expect(Buffer.byteLength(machineFactsWire, "utf8")).toBe(126);
-    expect(sha256(machineFactsWire)).toBe(
+    expect(sha256Hex(machineFactsWire)).toBe(
       "d7d4dd24b9139a19120220d3caec036c37c465f6db65589ba9df60aa384c5b8b",
     );
   });
 
   it("freezes Machine Facts and task-local identity vectors", () => {
-    const datasetNode = physicalDatasetNodeId({
+    const datasetNode = taskLocalPhysicalDatasetNodeId({
       platform: " HIVE ",
       dataSource: " GFHIVE ",
       qualifiedName: " DM_RSK_N.OTC_OPT_POSITION ",
@@ -181,11 +183,15 @@ describe("identity contract", () => {
     };
 
     expect(taskNodeId("105387")).toBe("task:105387");
-    expect(datasetId("hive-gfhive", "`DM_RSK_N`.`OTC_OPT_POSITION`")).toBe(
-      "dataset:hive-gfhive:dm_rsk_n.otc_opt_position",
-    );
     expect(
-      fieldId("hive-gfhive", "[DM_RSK_N].[OTC_OPT_POSITION]", "`DELTA`"),
+      machineFactsDatasetId("hive-gfhive", "`DM_RSK_N`.`OTC_OPT_POSITION`"),
+    ).toBe("dataset:hive-gfhive:dm_rsk_n.otc_opt_position");
+    expect(
+      machineFactsFieldId(
+        "hive-gfhive",
+        "[DM_RSK_N].[OTC_OPT_POSITION]",
+        "`DELTA`",
+      ),
     ).toBe("field:hive-gfhive:dm_rsk_n.otc_opt_position.delta");
     expect(physicalFieldKey(field)).toBe(
       "hive|gfhive|dm_rsk_n.otc_opt_position__gfhive|dm_rsk_n.otc_opt_position|delta",
@@ -194,20 +200,20 @@ describe("identity contract", () => {
     expect(datasetNode).toBe(
       "dataset:0296d9a2024b093b37c53863e078b34f3caff17365c97432e3e0bf06745e2ec0",
     );
-    expect(fieldEvidencePhysicalFieldNodeId(field)).toBe(
+    expect(taskLocalPhysicalFieldNodeId(field)).toBe(
       "physical-field:4e0db6da92fbda295a2ca2d0b0f9df92f76cc95e593af7121f93e86e9edb5a2e",
     );
     expect(
-      targetWriteNodeId({
+      taskLocalTargetWriteNodeId({
         taskId: "105387",
         datasetNodeId: datasetNode,
-        writeObservationId: "write-observation:105387:3",
+        writeObservationId: sqlParsedWriteObservationId("105387", 3),
       }),
     ).toBe(
       "target-write:614f3ca331de36f4ef7465f1584edc0986912bd6b93498fd3f24f8718afd139e",
     );
     expect(
-      readOccurrenceNodeId({
+      taskLocalReadOccurrenceNodeId({
         consumerTaskId: "176827",
         occurrenceId: "task:176827:statement:2:relation:read:0",
         readRelationId: "task:176827:statement:2:relation:read",
@@ -218,6 +224,13 @@ describe("identity contract", () => {
   });
 
   it("freezes explicit and platform-target write observations from Machine Facts", () => {
+    expect(sqlParsedWriteObservationId(EXPLICIT_TASK_ID, 0)).toBe(
+      EXPLICIT_WRITE_OBSERVATION_ID,
+    );
+    expect(platformTargetWriteObservationId(PLATFORM_TASK_ID, 0)).toBe(
+      PLATFORM_WRITE_OBSERVATION_ID,
+    );
+
     const explicitWrites = bundleRecords(EXPLICIT_TASK_ID, "dataset-io.jsonl")
       .filter(
         (record) =>
@@ -232,7 +245,7 @@ describe("identity contract", () => {
       }));
     expect(explicitWrites).toEqual([
       {
-        writeObservationId: "write-observation:410:0",
+        writeObservationId: EXPLICIT_WRITE_OBSERVATION_ID,
         statementId: "task:410:slot:query:statement:0",
         writeKind: "INSERT_OVERWRITE",
         provenance: "SQL_PARSE",
@@ -253,7 +266,7 @@ describe("identity contract", () => {
       }));
     expect(platformWrites).toEqual([
       {
-        writeObservationId: "write-observation:420:platform-target:0",
+        writeObservationId: PLATFORM_WRITE_OBSERVATION_ID,
         statementId: "task:420:slot:query:statement:0",
         writeKind: "PACK_DECLARED_QUERY_OUTPUT",
         provenance: "PLATFORM_TARGET",
@@ -265,14 +278,29 @@ describe("identity contract", () => {
         (record) => record.write_observation_id,
       ),
     );
-    expect([...explicitBindingWriteIds]).toEqual(["write-observation:410:0"]);
+    expect([...explicitBindingWriteIds]).toEqual([
+      EXPLICIT_WRITE_OBSERVATION_ID,
+    ]);
   });
 
   it("freezes the rich target-causal target-write identity", () => {
+    const expectedCausalTargetWriteId = causalTargetWriteId({
+      taskId: EXPLICIT_TASK_ID,
+      targetTableKey: EXPLICIT_TARGET,
+      sqlSourceId: "task:410:slot:query",
+      statementOrdinal: 0,
+      taskWriteOrdinal: 0,
+      rootRelationId: "task:410:statement:0:relation:root.project",
+      writeObservationId: EXPLICIT_WRITE_OBSERVATION_ID,
+    });
+    expect(expectedCausalTargetWriteId).toBe(
+      "target-write:78d1b67771b31386af9051d6c7a6ff479fcf75b3531a7055dac217ff2b3b71ee",
+    );
+
     const resolution = resolveTargetWrite({
       taskId: EXPLICIT_TASK_ID,
       targetTable: EXPLICIT_TARGET,
-      writeObservationIds: ["write-observation:410:0"],
+      writeObservationIds: [EXPLICIT_WRITE_OBSERVATION_ID],
       load: loadCurrentTaskBundle(factsRoot, EXPLICIT_TASK_ID),
       snapshot: {
         inputPackFingerprint: "fixture:input-pack",
@@ -287,15 +315,14 @@ describe("identity contract", () => {
     expect(resolution.ref).not.toBeNull();
     const { evidenceRefs, ...identity } = resolution.ref!.identity;
     expect(identity).toEqual({
-      targetWriteId:
-        "target-write:78d1b67771b31386af9051d6c7a6ff479fcf75b3531a7055dac217ff2b3b71ee",
+      targetWriteId: expectedCausalTargetWriteId,
       taskId: EXPLICIT_TASK_ID,
       targetTableKey: EXPLICIT_TARGET,
       sqlSourceId: "task:410:slot:query",
       statementOrdinal: 0,
       taskWriteOrdinal: 0,
       rootRelationId: "task:410:statement:0:relation:root.project",
-      writeObservationId: "write-observation:410:0",
+      writeObservationId: EXPLICIT_WRITE_OBSERVATION_ID,
     });
     expect(evidenceRefs).toEqual(
       expect.arrayContaining([
@@ -305,14 +332,14 @@ describe("identity contract", () => {
       ]),
     );
     expect(identity.targetWriteId).not.toBe(
-      targetWriteNodeId({
+      taskLocalTargetWriteNodeId({
         taskId: EXPLICIT_TASK_ID,
-        datasetNodeId: physicalDatasetNodeId({
+        datasetNodeId: taskLocalPhysicalDatasetNodeId({
           platform: "hive",
           dataSource: "gfhive",
           qualifiedName: EXPLICIT_TARGET,
         }),
-        writeObservationId: "write-observation:410:0",
+        writeObservationId: EXPLICIT_WRITE_OBSERVATION_ID,
       }),
     );
   });

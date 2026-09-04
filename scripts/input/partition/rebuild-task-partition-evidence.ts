@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
+import { canonicalInputPackHash as canonicalHash } from "../../../src/contracts/canonical-json.js";
 import {
   buildCompactTaskPartition,
   buildTaskPartitionEvidence,
@@ -16,7 +17,6 @@ import {
 } from "../shared/task-partition-evidence.ts";
 import {
   SQL_SLOTS,
-  canonicalHash,
   type JsonValue,
   type SqlSlot,
   type TaskCodeEvidence,

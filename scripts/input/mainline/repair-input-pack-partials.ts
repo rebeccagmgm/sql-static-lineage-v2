@@ -7,9 +7,9 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
+import { sha256File } from "../../../src/adapters/files/sha256-file.js";
 import {
   createTableDocument,
-  sha256File,
   writeTableInput,
   type TableEvidence,
   type TaskEvidence,

@@ -4,7 +4,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { canonicalJsonl, sha256 } from "../../scripts/machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJsonl as canonicalJsonl } from "../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../src/contracts/sha256.js";
 import {
   hashJsonlStore,
   inspectJsonlStore,
@@ -59,7 +60,10 @@ describe("jsonl-store gzip envelope", () => {
     const records = [{ task_id: "t", direction: "READ", dataset_id: "d" }];
     const bytes = canonicalJsonl(records);
     writeFileSync(logical, bytes, "utf8");
-    expect(inspectJsonlStore(logical)).toEqual({ status: "PLAIN", path: logical });
+    expect(inspectJsonlStore(logical)).toEqual({
+      status: "PLAIN",
+      path: logical,
+    });
     expect(readJsonlRecords(logical)).toEqual(records);
     expect(hashJsonlStore(logical)).toBe(sha256(bytes));
   });

@@ -20,11 +20,13 @@ import {
   sep,
 } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sha256File } from "../../../src/adapters/files/sha256-file.js";
 import {
-  canonicalHash,
-  canonicalJson,
-  sha256File,
-  sha256Text,
+  canonicalInputPackHash as canonicalHash,
+  canonicalInputPackJson as canonicalJson,
+} from "../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256Text } from "../../../src/contracts/sha256.js";
+import {
   isFrozenScheduleStatus,
   isManualScheduleCycle,
   validateTableDocument,

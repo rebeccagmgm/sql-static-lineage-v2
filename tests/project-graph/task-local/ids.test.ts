@@ -1,18 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  fieldEvidencePhysicalFieldNodeId,
-  physicalDatasetNodeId,
-  targetWriteNodeId,
+  taskLocalPhysicalDatasetNodeId as physicalDatasetNodeId,
+  taskLocalPhysicalFieldNodeId as fieldEvidencePhysicalFieldNodeId,
+  taskLocalTargetWriteNodeId as targetWriteNodeId,
   taskNodeId,
-} from "../../../scripts/project-graph/task-local/ids.ts";
+} from "../../../src/contracts/identity.js";
 
 /** Frozen from data-graph reference run (2026-09-02). */
 const FROZEN = {
   task176827: "task:176827",
-  dataset176827: "dataset:9361065f311a6e6136facf6a6681538348d23e2adfac61c19e3d12db93c2b8ab",
-  targetWrite176827: "target-write:2cd94595d05a823e44cef54d899d7206327031f30021d701647499c782fd1a48",
-  refTrsKey: "physical-field:0307273847f1eae41dd4f40443879ad3fe57481ddca3d97af21a3c13259c85fc",
+  dataset176827:
+    "dataset:9361065f311a6e6136facf6a6681538348d23e2adfac61c19e3d12db93c2b8ab",
+  targetWrite176827:
+    "target-write:2cd94595d05a823e44cef54d899d7206327031f30021d701647499c782fd1a48",
+  refTrsKey:
+    "physical-field:0307273847f1eae41dd4f40443879ad3fe57481ddca3d97af21a3c13259c85fc",
 } as const;
 
 describe("task-local ids (data-graph parity)", () => {

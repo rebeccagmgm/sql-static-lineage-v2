@@ -1,17 +1,14 @@
-import {
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Schema, SqlSession } from "sqllens";
+import { canonicalMachineFactsJson as canonicalJson } from "../../src/contracts/canonical-json.js";
+import { physicalFieldKey } from "../../src/contracts/identity.js";
+import { sha256Hex as sha256 } from "../../src/contracts/sha256.js";
 import {
-  canonicalJson,
-  sha256,
   type GenericAnalysisProfile,
   type GenericTaskProfile,
 } from "../../scripts/machine-facts/machine-facts-contract.ts";
@@ -22,7 +19,6 @@ import {
 } from "../../scripts/machine-facts/machine-facts.ts";
 import * as planAdapter from "../../scripts/plans/plan-adapter.ts";
 import type { PhysicalFieldIdentity } from "../../scripts/reconcile/consumer/field-lineage/field-lineage-contract.ts";
-import { physicalFieldKey } from "../../scripts/reconcile/consumer/field-lineage/field-lineage-contract.ts";
 import { loadCurrentTaskBundle } from "../../scripts/query/current-task-bundle.ts";
 import {
   makeSemanticOccurrenceScope,
@@ -86,7 +82,9 @@ function schemaProvider(records: readonly SchemaRecord[]): Schema {
     Object.fromEntries(
       records.map((record) => [
         record.qualified_name,
-        Object.fromEntries(record.columns.map((column) => [column.name, "unknown"])),
+        Object.fromEntries(
+          record.columns.map((column) => [column.name, "unknown"]),
+        ),
       ]),
     ),
   );
@@ -186,7 +184,9 @@ function stableProjection(
           candidate.scopeRelationId === edge.scopeRelationId,
       );
       if (!definition || !root || !application || !edge.semanticScope)
-        throw new Error(`incomplete gold dependency projection for ${edge.edgeId}`);
+        throw new Error(
+          `incomplete gold dependency projection for ${edge.edgeId}`,
+        );
       return {
         rootCriterionId: root.rootCriterionId,
         rootWriteObservationId: root.rootWriteObservationId,
@@ -280,10 +280,7 @@ function evaluate(fixture: SemanticGoldCase): Evaluation {
   const outputRoot = mkdtempSync(join(tmpdir(), "real-sql-semantic-gold-"));
   roots.push(outputRoot);
   const records = readSchemaRecords();
-  const schemaBundle = mergeSchemaEvidence(
-    [{ records }],
-    LOGICAL_SOURCE_ID,
-  );
+  const schemaBundle = mergeSchemaEvidence([{ records }], LOGICAL_SOURCE_ID);
   const schemaBundleHash = sha256(canonicalJson(schemaBundle));
   const task: GenericTaskProfile = {
     task_id: fixture.taskId,
@@ -441,7 +438,9 @@ describe("real SQL occurrence-scoped semantic gold", () => {
               }),
             ]),
           );
-        const subjects = new Set(scopedEdges.map((edge) => subjectId(edge.fromSubject)));
+        const subjects = new Set(
+          scopedEdges.map((edge) => subjectId(edge.fromSubject)),
+        );
         for (const forbidden of expectedWrite.forbiddenSubjects)
           expect(subjects).not.toContain(forbidden);
       }
@@ -455,8 +454,7 @@ describe("real SQL occurrence-scoped semantic gold", () => {
         expect(
           gap.proofRefs.some(
             (proof) =>
-              proof.kind === "SOURCE_SPAN" &&
-              /:\d+:\d+$/.test(proof.refId),
+              proof.kind === "SOURCE_SPAN" && /:\d+:\d+$/.test(proof.refId),
           ),
         ).toBe(true);
       }

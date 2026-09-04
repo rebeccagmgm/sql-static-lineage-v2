@@ -9,8 +9,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { sha256File } from "../../../src/adapters/files/sha256-file.js";
 import {
-  sha256File,
   validateTableDocument,
   validateTaskDocument,
 } from "../shared/input-pack.ts";

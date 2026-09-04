@@ -1,4 +1,5 @@
-import { canonicalJson, sha256 } from "../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../src/contracts/sha256.js";
 
 export const FIELD_IMPACT_RESULT_SCHEMA_VERSION = "1.1.0" as const;
 export const FIELD_IMPACT_RESULT_ARTIFACT_TYPE = "FIELD_IMPACT_RESULT" as const;
@@ -49,9 +50,7 @@ export interface FieldImpactControlEntry {
 }
 
 export type FieldImpactScheduleRelation =
-  | "DIRECT_PARENT"
-  | "NOT_IN_HORAE_UPSTREAM"
-  | "HORAE_UNAVAILABLE";
+  "DIRECT_PARENT" | "NOT_IN_HORAE_UPSTREAM" | "HORAE_UNAVAILABLE";
 
 export interface FieldImpactFrontierCandidate {
   readonly taskId: string;
@@ -65,7 +64,10 @@ export interface FieldImpactFrontierCandidate {
 
 export interface FieldImpactFrontierEntry {
   readonly depth: number;
-  readonly readField: { readonly readOccurrenceId: string; readonly column: string };
+  readonly readField: {
+    readonly readOccurrenceId: string;
+    readonly column: string;
+  };
   readonly candidates: readonly FieldImpactFrontierCandidate[];
   readonly reasonCode: string;
 }
@@ -102,7 +104,7 @@ function text(value: unknown): string | null {
 
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : null;
 }
 
@@ -116,11 +118,20 @@ export function validateFieldImpactResult(value: unknown): FieldImpactResult {
     throw new Error("FIELD_IMPACT_RESULT_SCHEMA_VERSION_INVALID");
   }
   const anchor = record(root.anchor);
-  if (!anchor || !text(anchor.taskId) || !text(anchor.writeObservationId) || !text(anchor.outputColumn)) {
+  if (
+    !anchor ||
+    !text(anchor.taskId) ||
+    !text(anchor.writeObservationId) ||
+    !text(anchor.outputColumn)
+  ) {
     throw new Error("FIELD_IMPACT_RESULT_ANCHOR_INVALID");
   }
-  if (!Array.isArray(root.value) || !Array.isArray(root.control)
-    || !Array.isArray(root.frontier) || !Array.isArray(root.gaps)) {
+  if (
+    !Array.isArray(root.value) ||
+    !Array.isArray(root.control) ||
+    !Array.isArray(root.frontier) ||
+    !Array.isArray(root.gaps)
+  ) {
     throw new Error("FIELD_IMPACT_RESULT_SECTIONS_INVALID");
   }
   const budget = record(root.budget);
@@ -130,9 +141,13 @@ export function validateFieldImpactResult(value: unknown): FieldImpactResult {
   return value as FieldImpactResult;
 }
 
-export function fieldImpactResultContentHash(result: FieldImpactResult): string {
+export function fieldImpactResultContentHash(
+  result: FieldImpactResult,
+): string {
   const { anchor, value, control, frontier, gaps, budget } = result;
-  return sha256(canonicalJson({ anchor, value, control, frontier, gaps, budget }));
+  return sha256(
+    canonicalJson({ anchor, value, control, frontier, gaps, budget }),
+  );
 }
 
 export function emptyFieldImpactResult(input: {

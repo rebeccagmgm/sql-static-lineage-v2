@@ -1,19 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  taskLocalPhysicalDatasetNodeId as physicalDatasetNodeId,
+  taskLocalPhysicalFieldNodeId as fieldEvidencePhysicalFieldNodeId,
+  taskLocalReadOccurrenceNodeId as readOccurrenceNodeId,
+  taskLocalTargetWriteNodeId as targetWriteNodeId,
+  taskNodeId,
+} from "../../../src/contracts/identity.js";
+import {
   canonicalizeTaskLocalProjection,
   taskLocalProjectionContentHash,
   validateTaskLocalProjection,
   type TaskLocalProjection,
 } from "../../../scripts/project-graph/task-local/contract.ts";
 import {
-  fieldEvidencePhysicalFieldNodeId,
   fieldDirectEdgeSemanticKey,
-  physicalDatasetNodeId,
-  readOccurrenceNodeId,
-  targetWriteNodeId,
   taskLocalEdgeId,
-  taskNodeId,
 } from "../../../scripts/project-graph/task-local/ids.ts";
 
 const TASK_ID = "176827";
@@ -36,7 +38,9 @@ const FIELD_NODE = fieldEvidencePhysicalFieldNodeId({
   column: "inr_ord_id",
 });
 
-function minimalProjected(overrides: Partial<TaskLocalProjection> = {}): TaskLocalProjection {
+function minimalProjected(
+  overrides: Partial<TaskLocalProjection> = {},
+): TaskLocalProjection {
   const readsEdgeId = taskLocalEdgeId({
     edgeType: "READS",
     fromNodeId: TASK_NODE,
@@ -56,10 +60,21 @@ function minimalProjected(overrides: Partial<TaskLocalProjection> = {}): TaskLoc
       {
         nodeId: DATASET_NODE,
         nodeType: "PHYSICAL_DATASET" as const,
-        properties: { platform: "hive", qualifiedName: "dm_rsk_n.otc_opt_greek_val_det_h" },
+        properties: {
+          platform: "hive",
+          qualifiedName: "dm_rsk_n.otc_opt_greek_val_det_h",
+        },
       },
-      { nodeId: TARGET_WRITE_NODE, nodeType: "TARGET_WRITE" as const, properties: {} },
-      { nodeId: FIELD_NODE, nodeType: "PHYSICAL_FIELD" as const, properties: { column: "inr_ord_id" } },
+      {
+        nodeId: TARGET_WRITE_NODE,
+        nodeType: "TARGET_WRITE" as const,
+        properties: {},
+      },
+      {
+        nodeId: FIELD_NODE,
+        nodeType: "PHYSICAL_FIELD" as const,
+        properties: { column: "inr_ord_id" },
+      },
     ],
     edges: [
       {
@@ -126,7 +141,8 @@ function fieldEvidenceProjectionEdges(overrides: {
           sourceReadOccurrenceId:
             overrides.fieldProperties.sourceReadOccurrenceId === undefined
               ? "occ:0"
-              : (overrides.fieldProperties.sourceReadOccurrenceId as string | null),
+              : (overrides.fieldProperties.sourceReadOccurrenceId as
+                  string | null),
           expressionId,
         }),
       }),
@@ -155,17 +171,33 @@ function minimalFieldEvidenceProjected(input: {
       {
         nodeId: DATASET_NODE,
         nodeType: "PHYSICAL_DATASET",
-        properties: { platform: "hive", qualifiedName: "dm_rsk_n.otc_opt_greek_val_det_h" },
+        properties: {
+          platform: "hive",
+          qualifiedName: "dm_rsk_n.otc_opt_greek_val_det_h",
+        },
       },
       { nodeId: TARGET_WRITE_NODE, nodeType: "TARGET_WRITE", properties: {} },
-      { nodeId: FIELD_NODE, nodeType: "PHYSICAL_FIELD", properties: { column: "inr_ord_id" } },
+      {
+        nodeId: FIELD_NODE,
+        nodeType: "PHYSICAL_FIELD",
+        properties: { column: "inr_ord_id" },
+      },
     ],
-    edges: fieldEvidenceProjectionEdges({ fieldProperties: input.fieldProperties }),
+    edges: fieldEvidenceProjectionEdges({
+      fieldProperties: input.fieldProperties,
+    }),
   });
 }
 
-function withContentHash(projection: Omit<TaskLocalProjection, "contentHash"> & { contentHash?: string }): TaskLocalProjection {
-  const contentHash = taskLocalProjectionContentHash({ ...projection, contentHash: "" } as TaskLocalProjection);
+function withContentHash(
+  projection: Omit<TaskLocalProjection, "contentHash"> & {
+    contentHash?: string;
+  },
+): TaskLocalProjection {
+  const contentHash = taskLocalProjectionContentHash({
+    ...projection,
+    contentHash: "",
+  } as TaskLocalProjection);
   return { ...projection, contentHash } as TaskLocalProjection;
 }
 
@@ -191,19 +223,31 @@ describe("task-local projection contract", () => {
       failureReasonCode: null,
       nodes: [
         { nodeId: TASK_NODE, nodeType: "TASK", properties: {} },
-        { nodeId: occurrenceNode, nodeType: "READ_OCCURRENCE", properties: { occurrenceId: "occ:0" } },
+        {
+          nodeId: occurrenceNode,
+          nodeType: "READ_OCCURRENCE",
+          properties: { occurrenceId: "occ:0" },
+        },
         { nodeId: DATASET_NODE, nodeType: "PHYSICAL_DATASET", properties: {} },
       ],
       edges: [
         {
-          edgeId: taskLocalEdgeId({ edgeType: "READS", fromNodeId: TASK_NODE, toNodeId: occurrenceNode }),
+          edgeId: taskLocalEdgeId({
+            edgeType: "READS",
+            fromNodeId: TASK_NODE,
+            toNodeId: occurrenceNode,
+          }),
           edgeType: "READS",
           fromNodeId: TASK_NODE,
           toNodeId: occurrenceNode,
           properties: { readOccurrenceId: "occ:0" },
         },
         {
-          edgeId: taskLocalEdgeId({ edgeType: "READS", fromNodeId: occurrenceNode, toNodeId: DATASET_NODE }),
+          edgeId: taskLocalEdgeId({
+            edgeType: "READS",
+            fromNodeId: occurrenceNode,
+            toNodeId: DATASET_NODE,
+          }),
           edgeType: "READS",
           fromNodeId: occurrenceNode,
           toNodeId: DATASET_NODE,
@@ -227,13 +271,19 @@ describe("task-local projection contract", () => {
         { nodeId: TASK_NODE, nodeType: "TASK", properties: {} },
         { nodeId: DATASET_NODE, nodeType: "PHYSICAL_DATASET", properties: {} },
       ],
-      edges: [{
-        edgeId: taskLocalEdgeId({ edgeType: "READS", fromNodeId: TASK_NODE, toNodeId: DATASET_NODE }),
-        edgeType: "READS",
-        fromNodeId: TASK_NODE,
-        toNodeId: DATASET_NODE,
-        properties: {},
-      }],
+      edges: [
+        {
+          edgeId: taskLocalEdgeId({
+            edgeType: "READS",
+            fromNodeId: TASK_NODE,
+            toNodeId: DATASET_NODE,
+          }),
+          edgeType: "READS",
+          fromNodeId: TASK_NODE,
+          toNodeId: DATASET_NODE,
+          properties: {},
+        },
+      ],
     });
     expect(() => validateTaskLocalProjection(projection)).toThrow(
       "TASK_LOCAL_PROJECTION_READ_OCCURRENCE_EDGE_INVALID",
@@ -278,10 +328,17 @@ describe("task-local projection contract", () => {
     const bad = {
       ...projection,
       edges: projection.edges.map((edge, index) =>
-        index === 0 ? { ...edge, properties: { ...edge.properties, affectedRootFields: ["x"] } } : edge,
+        index === 0
+          ? {
+              ...edge,
+              properties: { ...edge.properties, affectedRootFields: ["x"] },
+            }
+          : edge,
       ),
     };
-    expect(() => validateTaskLocalProjection(bad)).toThrow("TASK_LOCAL_EDGE_AFFECTED_ROOT_FIELDS_FORBIDDEN");
+    expect(() => validateTaskLocalProjection(bad)).toThrow(
+      "TASK_LOCAL_EDGE_AFFECTED_ROOT_FIELDS_FORBIDDEN",
+    );
   });
 
   it("rejects rowsetControls on nodes", () => {
@@ -292,7 +349,9 @@ describe("task-local projection contract", () => {
         index === 0 ? { ...node, properties: { rowsetControls: [] } } : node,
       ),
     };
-    expect(() => validateTaskLocalProjection(bad)).toThrow("TASK_LOCAL_NODE_ROWSET_CONTROLS_FORBIDDEN");
+    expect(() => validateTaskLocalProjection(bad)).toThrow(
+      "TASK_LOCAL_NODE_ROWSET_CONTROLS_FORBIDDEN",
+    );
   });
 
   it("requires DATASET_CONTROL to target TARGET_WRITE", () => {
@@ -391,7 +450,9 @@ describe("task-local projection contract", () => {
           },
         ],
       }),
-    ).toThrow(/TASK_LOCAL_PROJECTION_(CROSS_TASK_DATA_EDGE|SCHEDULE_REFERENCE_ON_DATA_EDGE)/);
+    ).toThrow(
+      /TASK_LOCAL_PROJECTION_(CROSS_TASK_DATA_EDGE|SCHEDULE_REFERENCE_ON_DATA_EDGE)/,
+    );
   });
 
   it("rejects 1.2.0 READS edges missing readOccurrenceId even when current schema constant is 1.2.0", () => {
@@ -414,14 +475,22 @@ describe("task-local projection contract", () => {
       ],
       edges: [
         {
-          edgeId: taskLocalEdgeId({ edgeType: "READS", fromNodeId: TASK_NODE, toNodeId: occurrenceNode }),
+          edgeId: taskLocalEdgeId({
+            edgeType: "READS",
+            fromNodeId: TASK_NODE,
+            toNodeId: occurrenceNode,
+          }),
           edgeType: "READS",
           fromNodeId: TASK_NODE,
           toNodeId: occurrenceNode,
           properties: {},
         },
         {
-          edgeId: taskLocalEdgeId({ edgeType: "READS", fromNodeId: occurrenceNode, toNodeId: DATASET_NODE }),
+          edgeId: taskLocalEdgeId({
+            edgeType: "READS",
+            fromNodeId: occurrenceNode,
+            toNodeId: DATASET_NODE,
+          }),
           edgeType: "READS",
           fromNodeId: occurrenceNode,
           toNodeId: DATASET_NODE,
@@ -461,10 +530,17 @@ describe("task-local projection contract", () => {
         {
           nodeId: DATASET_NODE,
           nodeType: "PHYSICAL_DATASET",
-          properties: { platform: "hive", qualifiedName: "dm_rsk_n.otc_opt_greek_val_det_h" },
+          properties: {
+            platform: "hive",
+            qualifiedName: "dm_rsk_n.otc_opt_greek_val_det_h",
+          },
         },
         { nodeId: TARGET_WRITE_NODE, nodeType: "TARGET_WRITE", properties: {} },
-        { nodeId: FIELD_NODE, nodeType: "PHYSICAL_FIELD", properties: { column: "inr_ord_id" } },
+        {
+          nodeId: FIELD_NODE,
+          nodeType: "PHYSICAL_FIELD",
+          properties: { column: "inr_ord_id" },
+        },
       ],
       edges: [
         {
@@ -539,10 +615,21 @@ describe("task-local projection contract", () => {
           {
             nodeId: DATASET_NODE,
             nodeType: "PHYSICAL_DATASET",
-            properties: { platform: "hive", qualifiedName: "dm_rsk_n.otc_opt_greek_val_det_h" },
+            properties: {
+              platform: "hive",
+              qualifiedName: "dm_rsk_n.otc_opt_greek_val_det_h",
+            },
           },
-          { nodeId: TARGET_WRITE_NODE, nodeType: "TARGET_WRITE", properties: {} },
-          { nodeId: FIELD_NODE, nodeType: "PHYSICAL_FIELD", properties: { column: "inr_ord_id" } },
+          {
+            nodeId: TARGET_WRITE_NODE,
+            nodeType: "TARGET_WRITE",
+            properties: {},
+          },
+          {
+            nodeId: FIELD_NODE,
+            nodeType: "PHYSICAL_FIELD",
+            properties: { column: "inr_ord_id" },
+          },
         ],
         edges: fieldEvidenceProjectionEdges({
           fieldProperties: {

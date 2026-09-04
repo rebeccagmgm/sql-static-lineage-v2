@@ -10,7 +10,7 @@
 ## 2. One Current Contract Source
 
 - [x] 2.1 Write frozen tests for canonical JSON/hash and Task, physical dataset, physical field, read occurrence, target write, and write-observation identities; verify the expected vectors match the current producers before moving their implementations.
-- [ ] 2.2 Move canonical JSON/hash and identity implementations into `src/contracts/`, update current producers to use them, and verify the frozen vectors and artifact hashes are unchanged.
+- [x] 2.2 Move canonical JSON/hash and identity implementations into `src/contracts/`, update current producers to use them, and verify the frozen vectors and artifact hashes are unchanged.
 - [ ] 2.3 Consolidate the current one-hop, multi-hop, field-lineage, target-causal, task-local, continuation-index, and investigation contract types/loaders/validators under `src/contracts/`; verify every accepted version matches the design matrix.
 - [ ] 2.4 Replace duplicate contract/runtime imports in v2 and the selected `data-graph` code, then delete the copied implementations; verify repository search finds exactly one runtime identity/hash implementation and one validator for each retained artifact.
 - [ ] 2.5 Add current-version acceptance and historical-version rejection tests, including task-local `1.3.0`; verify unsupported versions and invalid hashes fail before output publication without coercion or fallback readers.

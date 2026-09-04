@@ -1,7 +1,5 @@
-import {
-  canonicalJson,
-  sha256,
-} from "../../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 import {
   globalExpressionId,
   globalRelationId,
@@ -126,8 +124,9 @@ type SemanticWriteOccurrenceIdentity = Omit<
 >;
 
 function ordered(values: readonly string[]): string[] {
-  return [...new Set(values.filter((value) => value.trim().length > 0))]
-    .sort((left, right) => left.localeCompare(right));
+  return [...new Set(values.filter((value) => value.trim().length > 0))].sort(
+    (left, right) => left.localeCompare(right),
+  );
 }
 
 function makeScope(
@@ -186,25 +185,39 @@ export function makeSemanticOccurrenceScope(input: {
     localRelationId,
   );
   if (
-    globalRelationId(root.rootTaskId, root.statementIndex, root.localRootRelationId) !== root.rootRelationId ||
-    globalExpressionId(root.rootTaskId, root.statementIndex, root.localOutputExpressionId) !== root.outputExpressionId
-  ) throw new Error(`SEMANTIC_SCOPE_ROOT_ROUNDTRIP_INVALID:${root.rootCriterionId}`);
-  return makeScope({
-    taskId: root.rootTaskId,
-    writeObservationId: root.rootWriteObservationId,
-    sqlSourceId: root.sqlSourceId,
-    writeStatementId: root.writeStatementId,
-    statementId: root.statementId,
-    statementIndex: root.statementIndex,
-    rootRelationId: root.rootRelationId,
-    localRootRelationId: root.localRootRelationId,
-    outputExpressionId: root.outputExpressionId,
-    localOutputExpressionId: root.localOutputExpressionId,
-    outputBindingId: root.outputBindingId,
-    targetFieldBindingId: root.targetFieldBindingId,
-    relationId,
-    localRelationId,
-  }, input.evidenceRefs ?? []);
+    globalRelationId(
+      root.rootTaskId,
+      root.statementIndex,
+      root.localRootRelationId,
+    ) !== root.rootRelationId ||
+    globalExpressionId(
+      root.rootTaskId,
+      root.statementIndex,
+      root.localOutputExpressionId,
+    ) !== root.outputExpressionId
+  )
+    throw new Error(
+      `SEMANTIC_SCOPE_ROOT_ROUNDTRIP_INVALID:${root.rootCriterionId}`,
+    );
+  return makeScope(
+    {
+      taskId: root.rootTaskId,
+      writeObservationId: root.rootWriteObservationId,
+      sqlSourceId: root.sqlSourceId,
+      writeStatementId: root.writeStatementId,
+      statementId: root.statementId,
+      statementIndex: root.statementIndex,
+      rootRelationId: root.rootRelationId,
+      localRootRelationId: root.localRootRelationId,
+      outputExpressionId: root.outputExpressionId,
+      localOutputExpressionId: root.localOutputExpressionId,
+      outputBindingId: root.outputBindingId,
+      targetFieldBindingId: root.targetFieldBindingId,
+      relationId,
+      localRelationId,
+    },
+    input.evidenceRefs ?? [],
+  );
 }
 
 export function semanticScopeForRelation(
@@ -212,29 +225,37 @@ export function semanticScopeForRelation(
   localRelationId: string,
   evidenceRefs: readonly string[] = [],
 ): SemanticOccurrenceScope {
-  return makeScope({
-    taskId: scope.taskId,
-    writeObservationId: scope.writeObservationId,
-    sqlSourceId: scope.sqlSourceId,
-    writeStatementId: scope.writeStatementId,
-    statementId: scope.statementId,
-    statementIndex: scope.statementIndex,
-    rootRelationId: scope.rootRelationId,
-    localRootRelationId: scope.localRootRelationId,
-    outputExpressionId: scope.outputExpressionId,
-    localOutputExpressionId: scope.localOutputExpressionId,
-    outputBindingId: scope.outputBindingId,
-    targetFieldBindingId: scope.targetFieldBindingId,
-    relationId: globalRelationId(scope.taskId, scope.statementIndex, localRelationId),
-    localRelationId,
-  }, [...scope.evidenceRefs, ...evidenceRefs]);
+  return makeScope(
+    {
+      taskId: scope.taskId,
+      writeObservationId: scope.writeObservationId,
+      sqlSourceId: scope.sqlSourceId,
+      writeStatementId: scope.writeStatementId,
+      statementId: scope.statementId,
+      statementIndex: scope.statementIndex,
+      rootRelationId: scope.rootRelationId,
+      localRootRelationId: scope.localRootRelationId,
+      outputExpressionId: scope.outputExpressionId,
+      localOutputExpressionId: scope.localOutputExpressionId,
+      outputBindingId: scope.outputBindingId,
+      targetFieldBindingId: scope.targetFieldBindingId,
+      relationId: globalRelationId(
+        scope.taskId,
+        scope.statementIndex,
+        localRelationId,
+      ),
+      localRelationId,
+    },
+    [...scope.evidenceRefs, ...evidenceRefs],
+  );
 }
 
 export function isCompleteSemanticOccurrenceScope(
   value: unknown,
   root?: RootCriterion,
 ): value is SemanticOccurrenceScope {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return false;
   const scope = value as Record<string, unknown>;
   const required = [
     "semanticScopeId",
@@ -252,8 +273,19 @@ export function isCompleteSemanticOccurrenceScope(
     "relationId",
     "localRelationId",
   ];
-  if (required.some((field) => typeof scope[field] !== "string" || String(scope[field]).trim() === "")) return false;
-  if (!Number.isInteger(scope.statementIndex) || Number(scope.statementIndex) < 0 || !Array.isArray(scope.evidenceRefs)) return false;
+  if (
+    required.some(
+      (field) =>
+        typeof scope[field] !== "string" || String(scope[field]).trim() === "",
+    )
+  )
+    return false;
+  if (
+    !Number.isInteger(scope.statementIndex) ||
+    Number(scope.statementIndex) < 0 ||
+    !Array.isArray(scope.evidenceRefs)
+  )
+    return false;
   const identity = {
     taskId: String(scope.taskId),
     writeObservationId: String(scope.writeObservationId),
@@ -272,23 +304,37 @@ export function isCompleteSemanticOccurrenceScope(
   };
   if (
     idFor("semantic-scope", identity) !== scope.semanticScopeId ||
-    globalRelationId(identity.taskId, identity.statementIndex, identity.localRootRelationId) !== identity.rootRelationId ||
-    globalExpressionId(identity.taskId, identity.statementIndex, identity.localOutputExpressionId) !== identity.outputExpressionId ||
-    globalRelationId(identity.taskId, identity.statementIndex, identity.localRelationId) !== identity.relationId
-  ) return false;
-  return root === undefined || (
-    identity.taskId === root.rootTaskId &&
-    identity.writeObservationId === root.rootWriteObservationId &&
-    identity.sqlSourceId === root.sqlSourceId &&
-    identity.writeStatementId === root.writeStatementId &&
-    identity.statementId === root.statementId &&
-    identity.statementIndex === root.statementIndex &&
-    identity.rootRelationId === root.rootRelationId &&
-    identity.localRootRelationId === root.localRootRelationId &&
-    identity.outputExpressionId === root.outputExpressionId &&
-    identity.localOutputExpressionId === root.localOutputExpressionId &&
-    identity.outputBindingId === root.outputBindingId &&
-    identity.targetFieldBindingId === root.targetFieldBindingId
+    globalRelationId(
+      identity.taskId,
+      identity.statementIndex,
+      identity.localRootRelationId,
+    ) !== identity.rootRelationId ||
+    globalExpressionId(
+      identity.taskId,
+      identity.statementIndex,
+      identity.localOutputExpressionId,
+    ) !== identity.outputExpressionId ||
+    globalRelationId(
+      identity.taskId,
+      identity.statementIndex,
+      identity.localRelationId,
+    ) !== identity.relationId
+  )
+    return false;
+  return (
+    root === undefined ||
+    (identity.taskId === root.rootTaskId &&
+      identity.writeObservationId === root.rootWriteObservationId &&
+      identity.sqlSourceId === root.sqlSourceId &&
+      identity.writeStatementId === root.writeStatementId &&
+      identity.statementId === root.statementId &&
+      identity.statementIndex === root.statementIndex &&
+      identity.rootRelationId === root.rootRelationId &&
+      identity.localRootRelationId === root.localRootRelationId &&
+      identity.outputExpressionId === root.outputExpressionId &&
+      identity.localOutputExpressionId === root.localOutputExpressionId &&
+      identity.outputBindingId === root.outputBindingId &&
+      identity.targetFieldBindingId === root.targetFieldBindingId)
   );
 }
 
@@ -421,7 +467,9 @@ export function makeSemanticDependencyDefinition(
     dependencyId: canonicalSemanticDependencyId({
       ...identity,
       ...(namespace === undefined ? {} : { namespace }),
-      ...(semanticScope === undefined ? {} : { semanticScopeId: semanticScope.semanticScopeId }),
+      ...(semanticScope === undefined
+        ? {}
+        : { semanticScopeId: semanticScope.semanticScopeId }),
     }),
     ...(semanticScope === undefined
       ? {}
@@ -486,9 +534,15 @@ export function makeSemanticDependencyEdge(input: {
     toSubject: input.toSubject,
     rootDependenceKind: input.rootDependenceKind,
     localEdgeKind: input.localEdgeKind,
-    ...(input.scopeRelationId === undefined ? {} : { scopeRelationId: input.scopeRelationId }),
-    ...(input.rootCriterionId === undefined ? {} : { rootCriterionId: input.rootCriterionId }),
-    ...(input.semanticScope === undefined ? {} : { semanticScopeId: input.semanticScope.semanticScopeId }),
+    ...(input.scopeRelationId === undefined
+      ? {}
+      : { scopeRelationId: input.scopeRelationId }),
+    ...(input.rootCriterionId === undefined
+      ? {}
+      : { rootCriterionId: input.rootCriterionId }),
+    ...(input.semanticScope === undefined
+      ? {}
+      : { semanticScopeId: input.semanticScope.semanticScopeId }),
   };
   return {
     ...input,
@@ -504,4 +558,3 @@ export function makeSemanticDependencyEdge(input: {
     ),
   };
 }
-

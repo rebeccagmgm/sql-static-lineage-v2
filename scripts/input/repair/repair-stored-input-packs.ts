@@ -11,9 +11,9 @@ import {
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
+import { canonicalInputPackHash as canonicalHash } from "../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256Text } from "../../../src/contracts/sha256.js";
 import {
-  canonicalHash,
-  sha256Text,
   type JsonValue,
   SQL_SLOTS,
   type SqlSlot,

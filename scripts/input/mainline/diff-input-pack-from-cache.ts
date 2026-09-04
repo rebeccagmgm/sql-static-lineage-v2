@@ -19,12 +19,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
+import { sha256File } from "../../../src/adapters/files/sha256-file.js";
 import {
   assembleCacheTaskEvidence,
   sqlSlotCount,
 } from "../shared/cache-task-evidence.ts";
 import {
-  sha256File,
   validateTaskDocument,
   type TaskDocument,
 } from "../shared/input-pack.ts";

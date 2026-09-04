@@ -7,7 +7,7 @@ import {
 } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { sha256File } from "../shared/input-pack.ts";
+import { sha256File } from "../../../src/adapters/files/sha256-file.js";
 import {
   DEFAULT_HIVE_DDL_JSONL_PATH,
   DEFAULT_HIVE_METADATA_JSONL_PATH,

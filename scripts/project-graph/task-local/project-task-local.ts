@@ -2,6 +2,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  taskLocalPhysicalDatasetNodeId as physicalDatasetNodeId,
+  taskLocalPhysicalFieldNodeId as fieldEvidencePhysicalFieldNodeId,
+  taskLocalReadOccurrenceNodeId as readOccurrenceNodeId,
+  taskLocalTargetWriteNodeId as targetWriteNodeId,
+  taskNodeId,
+} from "../../../src/contracts/identity.js";
+import {
   indexTaskInputPacks,
   loadPhysicalTableCatalog,
   type PhysicalTableCatalog,
@@ -21,9 +28,7 @@ import {
   fieldConditionalsForExpression,
   sourceFieldsForExpression,
 } from "../../reconcile/consumer/field-lineage/field-lineage.ts";
-import {
-  datasetControlsForStatement,
-} from "../../reconcile/shared/dataset-controls.ts";
+import { datasetControlsForStatement } from "../../reconcile/shared/dataset-controls.ts";
 import type { PhysicalFieldIdentity } from "../../reconcile/consumer/field-lineage/field-lineage-contract.ts";
 import { inferTaskDefaultSchema } from "../../reconcile/shared/task-default-schema.ts";
 import {
@@ -58,12 +63,7 @@ import { classifyExpressionSubtype } from "../field-evidence-v1/subtype-classifi
 import {
   fieldConditionalEdgeSemanticKey,
   fieldDirectEdgeSemanticKey,
-  fieldEvidencePhysicalFieldNodeId,
-  physicalDatasetNodeId,
-  readOccurrenceNodeId,
-  targetWriteNodeId,
   taskLocalEdgeId,
-  taskNodeId,
 } from "./ids.ts";
 import {
   isTempLikeTableName,
@@ -74,7 +74,10 @@ import {
   partitionPredicatesByReadOccurrence,
   readPartitionPredicatesForOccurrence,
 } from "./partition-predicates.ts";
-import { readTaskScheduleContext, type TaskScheduleContext } from "./schedule-context.ts";
+import {
+  readTaskScheduleContext,
+  type TaskScheduleContext,
+} from "./schedule-context.ts";
 
 export interface ProjectTaskLocalOptions {
   readonly factsRoot: string;
@@ -87,7 +90,10 @@ export interface ProjectTaskLocalOptions {
 // A CLI process projects many tasks against one immutable Pack/catalog snapshot.
 // Cache only directory indexes; file contents and Facts remain per-task reads.
 const physicalCatalogCache = new Map<string, PhysicalTableCatalog>();
-const taskPackIndexCache = new Map<string, ReadonlyMap<string, readonly string[]>>();
+const taskPackIndexCache = new Map<
+  string,
+  ReadonlyMap<string, readonly string[]>
+>();
 
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -95,13 +101,16 @@ function text(value: unknown): string | null {
 
 function records(value: unknown): readonly JsonRecord[] {
   return Array.isArray(value)
-    ? value.filter((item): item is JsonRecord => typeof item === "object" && item !== null && !Array.isArray(item))
+    ? value.filter(
+        (item): item is JsonRecord =>
+          typeof item === "object" && item !== null && !Array.isArray(item),
+      )
     : [];
 }
 
 function record(value: unknown): JsonRecord | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as JsonRecord
+    ? (value as JsonRecord)
     : null;
 }
 
@@ -137,23 +146,25 @@ export function resolveTaskLocalReadOccurrenceIdentities(input: {
       if (text(row.statement_id) !== statementId || !statementId) return false;
       const relation = record(row.relation);
       const relationType = (
-        text(row.relation_type)
-        ?? text(relation?.type)
-        ?? ""
+        text(row.relation_type) ??
+        text(relation?.type) ??
+        ""
       ).toLowerCase();
       if (relationType !== "read") return false;
       const relationName =
-        text(row.physical_dataset)
-        ?? text(relation?.table)
-        ?? text(relation?.physical_dataset)
-        ?? text(relation?.qualifiedName)
-        ?? text(relation?.qualified_name);
+        text(row.physical_dataset) ??
+        text(relation?.table) ??
+        text(relation?.physical_dataset) ??
+        text(relation?.qualifiedName) ??
+        text(relation?.qualified_name);
       if (relationName === null) return false;
       const normalizedRelationName = normalizeName(relationName);
-      return normalizedRelationName === normalizedQualifiedName
-        || (normalizedRawName !== null
-          && !normalizedRawName.includes(".")
-          && normalizedRelationName === normalizedRawName);
+      return (
+        normalizedRelationName === normalizedQualifiedName ||
+        (normalizedRawName !== null &&
+          !normalizedRawName.includes(".") &&
+          normalizedRelationName === normalizedRawName)
+      );
     })
     .map((row) => {
       const relation = record(row.relation);
@@ -178,7 +189,8 @@ export function resolveTaskLocalReadOccurrenceIdentities(input: {
       }
       if (!relationId && uniqueRelationIds.length === occurrences.length) {
         const recovered = uniqueRelationIds[index];
-        if (recovered) return { occurrenceId: recovered, relationId: recovered };
+        if (recovered)
+          return { occurrenceId: recovered, relationId: recovered };
       }
       if (!relationId && uniqueRelationIds.length === 1) {
         const recovered = uniqueRelationIds[0]!;
@@ -189,7 +201,10 @@ export function resolveTaskLocalReadOccurrenceIdentities(input: {
   }
 
   if (uniqueRelationIds.length > 0) {
-    return uniqueRelationIds.map((relationId) => ({ occurrenceId: relationId, relationId }));
+    return uniqueRelationIds.map((relationId) => ({
+      occurrenceId: relationId,
+      relationId,
+    }));
   }
   return [fallback(0)];
 }
@@ -198,9 +213,13 @@ function loadTaskPack(
   dataRoot: string,
   catalog: PhysicalTableCatalog,
   taskId: string,
-): { document: TaskDocument & JsonRecord; target: PhysicalTableCatalogEntry | null } | null {
-  const index = taskPackIndexCache.get(dataRoot)
-    ?? (() => {
+): {
+  document: TaskDocument & JsonRecord;
+  target: PhysicalTableCatalogEntry | null;
+} | null {
+  const index =
+    taskPackIndexCache.get(dataRoot) ??
+    (() => {
       const next = indexTaskInputPacks(dataRoot);
       taskPackIndexCache.set(dataRoot, next);
       return next;
@@ -213,7 +232,7 @@ function loadTaskPack(
   const document = raw as TaskDocument & JsonRecord;
   const targetName = text(document.target?.qualifiedName);
   const target = targetName
-    ? catalog.byQualifiedName.get(normalizeName(targetName))?.[0] ?? null
+    ? (catalog.byQualifiedName.get(normalizeName(targetName))?.[0] ?? null)
     : null;
   return { document, target };
 }
@@ -258,7 +277,9 @@ function ensureFieldNode(
   return nodeId;
 }
 
-function datasetProperties(identity: TaskLocalTableIdentity): Record<string, unknown> {
+function datasetProperties(
+  identity: TaskLocalTableIdentity,
+): Record<string, unknown> {
   return {
     platform: identity.platform,
     dataSource: identity.dataSource,
@@ -295,7 +316,9 @@ export interface MaterializationContext {
   readonly expressionId: string | null;
 }
 
-function materializationContextForExpression(expression: JsonRecord): MaterializationContext {
+function materializationContextForExpression(
+  expression: JsonRecord,
+): MaterializationContext {
   return {
     statementId: text(expression.statement_id),
     expressionId: text(expression.expression_id),
@@ -314,15 +337,24 @@ function materializationRecordsForDataset(
   const normalizedRaw = normalizeName(rawDataset);
   const normalizedQualified = normalizeName(qualifiedDataset);
   return materializationRecords.filter((materialization) => {
-    const materializedDataset = normalizeName(String(materialization.physical_dataset ?? ""));
-    return materializedDataset === normalizedRaw || materializedDataset === normalizedQualified;
+    const materializedDataset = normalizeName(
+      String(materialization.physical_dataset ?? ""),
+    );
+    return (
+      materializedDataset === normalizedRaw ||
+      materializedDataset === normalizedQualified
+    );
   });
 }
 
 function materializationRecordHasContext(materialization: JsonRecord): boolean {
-  return text(materialization.read_statement_id) !== null
-    || (Array.isArray(materialization.read_expression_ids)
-      && materialization.read_expression_ids.some((value: unknown) => text(value) !== null));
+  return (
+    text(materialization.read_statement_id) !== null ||
+    (Array.isArray(materialization.read_expression_ids) &&
+      materialization.read_expression_ids.some(
+        (value: unknown) => text(value) !== null,
+      ))
+  );
 }
 
 export function materializationRecordsForField(
@@ -330,23 +362,32 @@ export function materializationRecordsForField(
   source: PhysicalFieldIdentity,
   context: MaterializationContext,
 ): readonly JsonRecord[] {
-  const all = materializationsByField.get(materializationKey(source.qualifiedName, source.column)) ?? [];
+  const all =
+    materializationsByField.get(
+      materializationKey(source.qualifiedName, source.column),
+    ) ?? [];
   if (context.expressionId) {
-    const expressionMatches = all.filter((materialization) =>
-      Array.isArray(materialization.read_expression_ids)
-      && materialization.read_expression_ids.some(
-        (value: unknown) => text(value) === context.expressionId,
-      ),
+    const expressionMatches = all.filter(
+      (materialization) =>
+        Array.isArray(materialization.read_expression_ids) &&
+        materialization.read_expression_ids.some(
+          (value: unknown) => text(value) === context.expressionId,
+        ),
     );
     if (expressionMatches.length > 0) return expressionMatches;
   }
   if (context.statementId) {
     const statementMatches = all.filter(
-      (materialization) => text(materialization.read_statement_id) === context.statementId,
+      (materialization) =>
+        text(materialization.read_statement_id) === context.statementId,
     );
     if (statementMatches.length > 0) return statementMatches;
   }
-  return all.every((materialization) => !materializationRecordHasContext(materialization)) ? all : [];
+  return all.every(
+    (materialization) => !materializationRecordHasContext(materialization),
+  )
+    ? all
+    : [];
 }
 
 function isFinalWrite(
@@ -356,7 +397,8 @@ function isFinalWrite(
 ): boolean {
   if (writeKind?.toUpperCase() === "CREATE_TABLE") return false;
   const normalized = normalizeName(physicalDataset);
-  if (targetQualifiedName) return normalized === normalizeName(targetQualifiedName);
+  if (targetQualifiedName)
+    return normalized === normalizeName(targetQualifiedName);
   return !isTempLikeTableName(normalized);
 }
 
@@ -390,18 +432,25 @@ function taskLocalSourceFieldsForExpression(
     ...result,
     fields: result.fields.filter(
       (field) =>
-        field.identityStatus === "TASK_LOCAL_SCHEMA_BACKED"
-        || !bareInputTables.has(normalizeName(field.qualifiedName.split(".").at(-1) ?? "")),
+        field.identityStatus === "TASK_LOCAL_SCHEMA_BACKED" ||
+        !bareInputTables.has(
+          normalizeName(field.qualifiedName.split(".").at(-1) ?? ""),
+        ),
     ),
   };
 }
 
-function expressionFor(load: CurrentBundleLoad, binding: JsonRecord): JsonRecord | null {
+function expressionFor(
+  load: CurrentBundleLoad,
+  binding: JsonRecord,
+): JsonRecord | null {
   const expressionId = text(binding.expression_id);
   if (!expressionId) return null;
-  return records(load.records["field-expression-nodes.jsonl"]).find(
-    (expression) => text(expression.expression_id) === expressionId,
-  ) ?? null;
+  return (
+    records(load.records["field-expression-nodes.jsonl"]).find(
+      (expression) => text(expression.expression_id) === expressionId,
+    ) ?? null
+  );
 }
 
 function projectTaskLocalFromFacts(input: {
@@ -412,15 +461,20 @@ function projectTaskLocalFromFacts(input: {
   readonly dataRoot: string;
   readonly schedule: TaskScheduleContext | null;
 }): TaskLocalProjection {
-  const { taskId, generatedAt, load, evidenceStatus, dataRoot, schedule } = input;
-  const catalog = physicalCatalogCache.get(dataRoot)
-    ?? (() => {
+  const { taskId, generatedAt, load, evidenceStatus, dataRoot, schedule } =
+    input;
+  const catalog =
+    physicalCatalogCache.get(dataRoot) ??
+    (() => {
       const next = loadPhysicalTableCatalog(dataRoot, { lazyDdl: true });
       physicalCatalogCache.set(dataRoot, next);
       return next;
     })();
   const pack = loadTaskPack(dataRoot, catalog, taskId);
-  const fallbackTable = pack?.target ?? { platform: "hive", dataSource: "unknown" };
+  const fallbackTable = pack?.target ?? {
+    platform: "hive",
+    dataSource: "unknown",
+  };
   const defaultSchema = pack ? inferTaskDefaultSchema(pack.document) : null;
   const nodes = new Map<string, TaskLocalNode>();
   const edges: TaskLocalEdge[] = [];
@@ -443,9 +497,9 @@ function projectTaskLocalFromFacts(input: {
 
   const writeRecords = records(load.records["dataset-io.jsonl"]).filter(
     (record) =>
-      text(record.task_id) === taskId
-      && String(record.direction ?? "").toUpperCase() === "WRITE"
-      && text(record.write_observation_id),
+      text(record.task_id) === taskId &&
+      String(record.direction ?? "").toUpperCase() === "WRITE" &&
+      text(record.write_observation_id),
   );
   if (writeRecords.length === 0) {
     return buildCollectionFailedProjection({
@@ -459,11 +513,13 @@ function projectTaskLocalFromFacts(input: {
     });
   }
 
-  const resolvedBindings = records(load.records["output-field-bindings.jsonl"]).filter(
+  const resolvedBindings = records(
+    load.records["output-field-bindings.jsonl"],
+  ).filter(
     (binding) =>
-      text(binding.task_id) === taskId
-      && binding.binding_status === "RESOLVED"
-      && text(binding.write_observation_id),
+      text(binding.task_id) === taskId &&
+      binding.binding_status === "RESOLVED" &&
+      text(binding.write_observation_id),
   );
   const primaryTarget = pack?.target ?? null;
   if (resolvedBindings.length > 0 && !primaryTarget) {
@@ -482,16 +538,19 @@ function projectTaskLocalFromFacts(input: {
   for (const write of writeRecords) {
     const writeObservationId = text(write.write_observation_id)!;
     const statementId =
-      text(write.write_statement_id)
-      ?? text(write.statement_id);
-    if (statementId) writeObservationByStatement.set(statementId, writeObservationId);
+      text(write.write_statement_id) ?? text(write.statement_id);
+    if (statementId)
+      writeObservationByStatement.set(statementId, writeObservationId);
   }
   for (const binding of resolvedBindings) {
     const writeObservationId = text(binding.write_observation_id);
     const statementId =
-      text(binding.write_statement_id)
-      ?? text(binding.statement_id);
-    if (writeObservationId && statementId && !writeObservationByStatement.has(statementId)) {
+      text(binding.write_statement_id) ?? text(binding.statement_id);
+    if (
+      writeObservationId &&
+      statementId &&
+      !writeObservationByStatement.has(statementId)
+    ) {
       writeObservationByStatement.set(statementId, writeObservationId);
     }
   }
@@ -500,10 +559,13 @@ function projectTaskLocalFromFacts(input: {
   const bindingById = new Map(
     outputBindings
       .map((binding) => [text(binding.binding_id), binding] as const)
-      .filter((entry): entry is readonly [string, JsonRecord] => entry[0] !== null),
+      .filter(
+        (entry): entry is readonly [string, JsonRecord] => entry[0] !== null,
+      ),
   );
-  const materializationRecords = records(load.records["task-local-materializations.jsonl"])
-    .filter((record) => text(record.task_id) === taskId);
+  const materializationRecords = records(
+    load.records["task-local-materializations.jsonl"],
+  ).filter((record) => text(record.task_id) === taskId);
   const materializationsByField = new Map<string, JsonRecord[]>();
   for (const materialization of materializationRecords) {
     const dataset = text(materialization.physical_dataset);
@@ -531,15 +593,16 @@ function projectTaskLocalFromFacts(input: {
       String(write.physical_dataset ?? ""),
       baseIdentity.qualifiedName,
     );
-    const identity = isTempLikeTableName(String(write.physical_dataset ?? ""))
-      && writeMaterializations.length === 0
-      && baseIdentity.identityStatus === "CONFIRMED"
-      ? {
-        ...baseIdentity,
-        identityStatus: "CANDIDATE_DATASET" as const,
-        identityReasonCode: "TEMP_MATERIALIZATION_MISSING",
-      }
-      : baseIdentity;
+    const identity =
+      isTempLikeTableName(String(write.physical_dataset ?? "")) &&
+      writeMaterializations.length === 0 &&
+      baseIdentity.identityStatus === "CONFIRMED"
+        ? {
+            ...baseIdentity,
+            identityStatus: "CANDIDATE_DATASET" as const,
+            identityReasonCode: "TEMP_MATERIALIZATION_MISSING",
+          }
+        : baseIdentity;
     const datasetNodeId = ensureDatasetNode(nodes, identity);
     const writeNodeId = targetWriteNodeId({
       taskId,
@@ -604,7 +667,11 @@ function projectTaskLocalFromFacts(input: {
   });
   const externalReadSummaries: TaskLocalExternalReadSummary[] = [];
   for (const read of records(load.records["dataset-io.jsonl"])) {
-    if (text(read.task_id) !== taskId || String(read.direction ?? "").toUpperCase() !== "READ") continue;
+    if (
+      text(read.task_id) !== taskId ||
+      String(read.direction ?? "").toUpperCase() !== "READ"
+    )
+      continue;
     const baseIdentity = resolveTaskLocalTableIdentity({
       catalog,
       rawName: String(read.physical_dataset ?? ""),
@@ -617,19 +684,23 @@ function projectTaskLocalFromFacts(input: {
       rawReadDataset,
       baseIdentity.qualifiedName,
     );
-    const identity = isTempLikeTableName(rawReadDataset) && datasetMaterializations.length === 0
-      ? {
-        ...baseIdentity,
-        identityStatus: "CANDIDATE_DATASET" as const,
-        identityReasonCode: "TEMP_MATERIALIZATION_MISSING",
-      }
-      : baseIdentity;
+    const identity =
+      isTempLikeTableName(rawReadDataset) &&
+      datasetMaterializations.length === 0
+        ? {
+            ...baseIdentity,
+            identityStatus: "CANDIDATE_DATASET" as const,
+            identityReasonCode: "TEMP_MATERIALIZATION_MISSING",
+          }
+        : baseIdentity;
     const datasetNodeId = ensureDatasetNode(nodes, identity);
     const hasResolvedMaterialization = datasetMaterializations.some(
-      (materialization) => String(materialization.status ?? "").toUpperCase() === "RESOLVED",
+      (materialization) =>
+        String(materialization.status ?? "").toUpperCase() === "RESOLVED",
     );
     const hasUnresolvedMaterialization = datasetMaterializations.some(
-      (materialization) => String(materialization.status ?? "").toUpperCase() !== "RESOLVED",
+      (materialization) =>
+        String(materialization.status ?? "").toUpperCase() !== "RESOLVED",
     );
     const readOccurrenceIds = resolveTaskLocalReadOccurrenceIdentities({
       taskId,
@@ -646,12 +717,14 @@ function projectTaskLocalFromFacts(input: {
       const readDisposition = selfRead
         ? "SELF_READ"
         : hasResolvedMaterialization && !hasUnresolvedMaterialization
-        ? "LOCAL_MATERIALIZATION"
-        : "EXTERNAL_READ";
+          ? "LOCAL_MATERIALIZATION"
+          : "EXTERNAL_READ";
       const occurrenceNodeId = readOccurrenceNodeId({
         consumerTaskId: taskId,
         occurrenceId: occurrence.occurrenceId,
-        readRelationId: occurrence.relationId ?? `${identity.qualifiedName}:${occurrenceIndex}`,
+        readRelationId:
+          occurrence.relationId ??
+          `${identity.qualifiedName}:${occurrenceIndex}`,
       });
       ensureNode(nodes, {
         nodeId: occurrenceNodeId,
@@ -739,17 +812,25 @@ function projectTaskLocalFromFacts(input: {
     gaps.push(gap);
   };
   const writtenDatasets = new Set(
-    writeRecords.map((write) => normalizeName(String(write.physical_dataset ?? ""))),
+    writeRecords.map((write) =>
+      normalizeName(String(write.physical_dataset ?? "")),
+    ),
   );
-  const materializationBreakTracker = new Map<string, {
-    columns: Set<string>;
-    affectedEdgeCount: number;
-    writeObservationIds: Set<string>;
-    materializationRecords: number;
-  }>();
+  const materializationBreakTracker = new Map<
+    string,
+    {
+      columns: Set<string>;
+      affectedEdgeCount: number;
+      writeObservationIds: Set<string>;
+      materializationRecords: number;
+    }
+  >();
   const materializationBreakKeys = new Set<string>();
 
-  const expandedMaterializationMemo = new Map<string, ExpandedMaterializedField[]>();
+  const expandedMaterializationMemo = new Map<
+    string,
+    ExpandedMaterializedField[]
+  >();
   const expandMaterializedField = (
     source: PhysicalFieldIdentity,
     visited: ReadonlySet<string> = new Set(),
@@ -769,18 +850,25 @@ function projectTaskLocalFromFacts(input: {
     );
     const resolved = candidates.filter(
       (materialization) =>
-        String(materialization.status ?? "").toUpperCase() === "RESOLVED"
-        && text(materialization.output_binding_id),
+        String(materialization.status ?? "").toUpperCase() === "RESOLVED" &&
+        text(materialization.output_binding_id),
     );
-    if (candidates.length !== 1 || resolved.length !== 1 || !primaryTarget || visited.has(fieldKey)) {
-      const result: ExpandedMaterializedField[] = [{
-        field: source,
-        materializationBridgeIds: [],
-        leafExpressionId: context.expressionId,
-        leafRelationId: null,
-        pathHadAggregation: subtypeHops.some((hop) => hop.pathHadAggregation),
-        subtypeHops,
-      }];
+    if (
+      candidates.length !== 1 ||
+      resolved.length !== 1 ||
+      !primaryTarget ||
+      visited.has(fieldKey)
+    ) {
+      const result: ExpandedMaterializedField[] = [
+        {
+          field: source,
+          materializationBridgeIds: [],
+          leafExpressionId: context.expressionId,
+          leafRelationId: null,
+          pathHadAggregation: subtypeHops.some((hop) => hop.pathHadAggregation),
+          subtypeHops,
+        },
+      ];
       if (visited.size === 0) expandedMaterializationMemo.set(memoKey, result);
       return result;
     }
@@ -788,14 +876,16 @@ function projectTaskLocalFromFacts(input: {
     const binding = bindingById.get(text(materialization.output_binding_id)!);
     const expression = binding ? expressionFor(load, binding) : null;
     if (!expression) {
-      const result: ExpandedMaterializedField[] = [{
-        field: source,
-        materializationBridgeIds: [],
-        leafExpressionId: context.expressionId,
-        leafRelationId: null,
-        pathHadAggregation: subtypeHops.some((hop) => hop.pathHadAggregation),
-        subtypeHops,
-      }];
+      const result: ExpandedMaterializedField[] = [
+        {
+          field: source,
+          materializationBridgeIds: [],
+          leafExpressionId: context.expressionId,
+          leafRelationId: null,
+          pathHadAggregation: subtypeHops.some((hop) => hop.pathHadAggregation),
+          subtypeHops,
+        },
+      ];
       if (visited.size === 0) expandedMaterializationMemo.set(memoKey, result);
       return result;
     }
@@ -814,14 +904,18 @@ function projectTaskLocalFromFacts(input: {
       defaultSchema,
     );
     if (underlying.fields.length === 0) {
-      const result: ExpandedMaterializedField[] = [{
-        field: source,
-        materializationBridgeIds: [],
-        leafExpressionId: text(expression.expression_id),
-        leafRelationId: text(expression.relation_id),
-        pathHadAggregation: [...subtypeHops, hop].some((item) => item.pathHadAggregation),
-        subtypeHops: [...subtypeHops, hop],
-      }];
+      const result: ExpandedMaterializedField[] = [
+        {
+          field: source,
+          materializationBridgeIds: [],
+          leafExpressionId: text(expression.expression_id),
+          leafRelationId: text(expression.relation_id),
+          pathHadAggregation: [...subtypeHops, hop].some(
+            (item) => item.pathHadAggregation,
+          ),
+          subtypeHops: [...subtypeHops, hop],
+        },
+      ];
       if (visited.size === 0) expandedMaterializationMemo.set(memoKey, result);
       return result;
     }
@@ -829,18 +923,17 @@ function projectTaskLocalFromFacts(input: {
     nextVisited.add(fieldKey);
     const nestedContext = materializationContextForExpression(expression);
     const result = underlying.fields.flatMap((field) =>
-      expandMaterializedField(
-        field,
-        nextVisited,
-        nestedContext,
-        [...subtypeHops, hop],
-      ).map((expanded) => ({
+      expandMaterializedField(field, nextVisited, nestedContext, [
+        ...subtypeHops,
+        hop,
+      ]).map((expanded) => ({
         field: expanded.field,
         materializationBridgeIds: [
           text(materialization.bridge_id) ?? "",
           ...expanded.materializationBridgeIds,
         ].filter(Boolean),
-        leafExpressionId: expanded.leafExpressionId ?? text(expression.expression_id),
+        leafExpressionId:
+          expanded.leafExpressionId ?? text(expression.expression_id),
         leafRelationId: expanded.leafRelationId ?? text(expression.relation_id),
         pathHadAggregation: expanded.pathHadAggregation,
         subtypeHops: expanded.subtypeHops,
@@ -871,108 +964,123 @@ function projectTaskLocalFromFacts(input: {
       primaryTarget,
       defaultSchema,
     );
-    const materializationContext = materializationContextForExpression(expression);
+    const materializationContext =
+      materializationContextForExpression(expression);
     for (const rawSource of sources.fields) {
       const isTempBreakSource =
-        writtenDatasets.has(normalizeName(rawSource.qualifiedName))
-        && isTempLikeTableName(rawSource.qualifiedName);
+        writtenDatasets.has(normalizeName(rawSource.qualifiedName)) &&
+        isTempLikeTableName(rawSource.qualifiedName);
       for (const source of expandMaterializedField(
         rawSource,
         new Set(),
         materializationContext,
       )) {
-      const inputField = inputFieldRecordForSource(expression, source.field);
-      const emissions = emitFieldEvidenceForInput({
-        taskId,
-        expression,
-        sourceField: source.field,
-        inputField,
-        expanded: source,
-        indexes: fieldEvidenceIndexes,
-      });
-      for (const emission of emissions) {
-        const context = emission.expressionContexts[0];
-        if (!context) continue;
-        if (emission.sourceResolution.gap) pushGap(emission.sourceResolution.gap);
-        const fromNodeId = ensureFieldNode(nodes, source.field, catalog);
-        const bridgeIds = [...new Set(source.materializationBridgeIds)].sort(compareText);
-        const sourceReadOccurrenceId = emission.sourceResolution.sourceReadOccurrenceStatus
-          === "RESOLVED"
-          ? emission.sourceResolution.sourceReadOccurrenceId
-          : null;
-        pushEdge({
-          edgeId: taskLocalEdgeId({
+        const inputField = inputFieldRecordForSource(expression, source.field);
+        const emissions = emitFieldEvidenceForInput({
+          taskId,
+          expression,
+          sourceField: source.field,
+          inputField,
+          expanded: source,
+          indexes: fieldEvidenceIndexes,
+        });
+        for (const emission of emissions) {
+          const context = emission.expressionContexts[0];
+          if (!context) continue;
+          if (emission.sourceResolution.gap)
+            pushGap(emission.sourceResolution.gap);
+          const fromNodeId = ensureFieldNode(nodes, source.field, catalog);
+          const bridgeIds = [...new Set(source.materializationBridgeIds)].sort(
+            compareText,
+          );
+          const sourceReadOccurrenceId =
+            emission.sourceResolution.sourceReadOccurrenceStatus === "RESOLVED"
+              ? emission.sourceResolution.sourceReadOccurrenceId
+              : null;
+          pushEdge({
+            edgeId: taskLocalEdgeId({
+              edgeType: "FIELD_DIRECT",
+              fromNodeId,
+              toNodeId: targetWriteNode,
+              semanticKey: fieldDirectEdgeSemanticKey({
+                outputColumn,
+                sourceColumn: source.field.column,
+                sourceTable: source.field.qualifiedName,
+                sourceReadOccurrenceId,
+                expressionId: context.expressionId,
+              }),
+            }),
             edgeType: "FIELD_DIRECT",
             fromNodeId,
             toNodeId: targetWriteNode,
-            semanticKey: fieldDirectEdgeSemanticKey({
+            properties: {
+              subtype: emission.subtype,
+              ...(emission.subtypeReason
+                ? { subtypeReason: emission.subtypeReason }
+                : {}),
               outputColumn,
-              sourceColumn: source.field.column,
-              sourceTable: source.field.qualifiedName,
-              sourceReadOccurrenceId,
+              bindingId: text(binding.binding_id),
               expressionId: context.expressionId,
-            }),
-          }),
-          edgeType: "FIELD_DIRECT",
-          fromNodeId,
-          toNodeId: targetWriteNode,
-          properties: {
-            subtype: emission.subtype,
-            ...(emission.subtypeReason ? { subtypeReason: emission.subtypeReason } : {}),
-            outputColumn,
-            bindingId: text(binding.binding_id),
-            expressionId: context.expressionId,
-            sourceReadOccurrenceId,
-            sourceReadOccurrenceStatus: emission.sourceResolution.sourceReadOccurrenceStatus,
-            ...(emission.sourceResolution.sourceReadOccurrenceReason
-              ? { sourceReadOccurrenceReason: emission.sourceResolution.sourceReadOccurrenceReason }
-              : {}),
-            sourceRelationId: emission.sourceResolution.sourceRelationId,
-            ...(bridgeIds.length > 0
-              ? { materializationBridgeIds: bridgeIds, materializationFolded: true }
-              : {}),
-          },
-        });
-        const sourceStillTemp =
-          isTempBreakSource
-          && bridgeIds.length === 0
-          && writtenDatasets.has(normalizeName(source.field.qualifiedName))
-          && isTempLikeTableName(source.field.qualifiedName);
-        if (sourceStillTemp) {
-          const breakKey = `${writeObservationId}|${outputColumn}|${rawSource.column}`;
-          if (!materializationBreakKeys.has(breakKey)) {
-            materializationBreakKeys.add(breakKey);
-            const sourceDataset = normalizeName(rawSource.qualifiedName);
-            const tracker = materializationBreakTracker.get(sourceDataset) ?? {
-              columns: new Set<string>(),
-              affectedEdgeCount: 0,
-              writeObservationIds: new Set<string>(),
-              materializationRecords: materializationRecordsForDataset(
-                materializationRecords,
+              sourceReadOccurrenceId,
+              sourceReadOccurrenceStatus:
+                emission.sourceResolution.sourceReadOccurrenceStatus,
+              ...(emission.sourceResolution.sourceReadOccurrenceReason
+                ? {
+                    sourceReadOccurrenceReason:
+                      emission.sourceResolution.sourceReadOccurrenceReason,
+                  }
+                : {}),
+              sourceRelationId: emission.sourceResolution.sourceRelationId,
+              ...(bridgeIds.length > 0
+                ? {
+                    materializationBridgeIds: bridgeIds,
+                    materializationFolded: true,
+                  }
+                : {}),
+            },
+          });
+          const sourceStillTemp =
+            isTempBreakSource &&
+            bridgeIds.length === 0 &&
+            writtenDatasets.has(normalizeName(source.field.qualifiedName)) &&
+            isTempLikeTableName(source.field.qualifiedName);
+          if (sourceStillTemp) {
+            const breakKey = `${writeObservationId}|${outputColumn}|${rawSource.column}`;
+            if (!materializationBreakKeys.has(breakKey)) {
+              materializationBreakKeys.add(breakKey);
+              const sourceDataset = normalizeName(rawSource.qualifiedName);
+              const tracker = materializationBreakTracker.get(
                 sourceDataset,
-                sourceDataset,
-              ).length,
-            };
-            tracker.columns.add(rawSource.column);
-            tracker.affectedEdgeCount += 1;
-            tracker.writeObservationIds.add(writeObservationId);
-            materializationBreakTracker.set(sourceDataset, tracker);
+              ) ?? {
+                columns: new Set<string>(),
+                affectedEdgeCount: 0,
+                writeObservationIds: new Set<string>(),
+                materializationRecords: materializationRecordsForDataset(
+                  materializationRecords,
+                  sourceDataset,
+                  sourceDataset,
+                ).length,
+              };
+              tracker.columns.add(rawSource.column);
+              tracker.affectedEdgeCount += 1;
+              tracker.writeObservationIds.add(writeObservationId);
+              materializationBreakTracker.set(sourceDataset, tracker);
+            }
           }
-        }
-        if (bridgeIds.length > 0) {
-          const pathKey = `${fromNodeId}|${targetWriteNode}|${outputColumn}`;
-          if (!localFieldPathKeys.has(pathKey)) {
-            localFieldPathKeys.add(pathKey);
-            localFieldPaths.push({
-              sourceFieldNodeId: fromNodeId,
-              targetWriteNodeId: targetWriteNode,
-              outputColumn,
-              materializationBridgeIds: bridgeIds,
-            });
+          if (bridgeIds.length > 0) {
+            const pathKey = `${fromNodeId}|${targetWriteNode}|${outputColumn}`;
+            if (!localFieldPathKeys.has(pathKey)) {
+              localFieldPathKeys.add(pathKey);
+              localFieldPaths.push({
+                sourceFieldNodeId: fromNodeId,
+                targetWriteNodeId: targetWriteNode,
+                outputColumn,
+                materializationBridgeIds: bridgeIds,
+              });
+            }
           }
         }
       }
-    }
     }
     for (const conditional of fieldConditionalsForExpression(
       load,
@@ -1004,12 +1112,13 @@ function projectTaskLocalFromFacts(input: {
         for (const emission of emissions) {
           const context = emission.expressionContexts[0];
           if (!context) continue;
-          if (emission.sourceResolution.gap) pushGap(emission.sourceResolution.gap);
+          if (emission.sourceResolution.gap)
+            pushGap(emission.sourceResolution.gap);
           const fromNodeId = ensureFieldNode(nodes, source, catalog);
-          const sourceReadOccurrenceId = emission.sourceResolution.sourceReadOccurrenceStatus
-            === "RESOLVED"
-            ? emission.sourceResolution.sourceReadOccurrenceId
-            : null;
+          const sourceReadOccurrenceId =
+            emission.sourceResolution.sourceReadOccurrenceStatus === "RESOLVED"
+              ? emission.sourceResolution.sourceReadOccurrenceId
+              : null;
           pushEdge({
             edgeId: taskLocalEdgeId({
               edgeType: "FIELD_CONDITIONAL",
@@ -1032,9 +1141,13 @@ function projectTaskLocalFromFacts(input: {
               outputColumn,
               expressionId: context.expressionId,
               sourceReadOccurrenceId,
-              sourceReadOccurrenceStatus: emission.sourceResolution.sourceReadOccurrenceStatus,
+              sourceReadOccurrenceStatus:
+                emission.sourceResolution.sourceReadOccurrenceStatus,
               ...(emission.sourceResolution.sourceReadOccurrenceReason
-                ? { sourceReadOccurrenceReason: emission.sourceResolution.sourceReadOccurrenceReason }
+                ? {
+                    sourceReadOccurrenceReason:
+                      emission.sourceResolution.sourceReadOccurrenceReason,
+                  }
                 : {}),
               sourceRelationId: emission.sourceResolution.sourceRelationId,
             },
@@ -1045,14 +1158,16 @@ function projectTaskLocalFromFacts(input: {
   }
 
   for (const [physicalDataset, tracker] of materializationBreakTracker) {
-    pushGap(materializationBreakGap({
-      taskId,
-      physicalDataset,
-      columns: [...tracker.columns],
-      affectedEdgeCount: tracker.affectedEdgeCount,
-      writeObservationIds: [...tracker.writeObservationIds],
-      materializationRecords: tracker.materializationRecords,
-    }));
+    pushGap(
+      materializationBreakGap({
+        taskId,
+        physicalDataset,
+        columns: [...tracker.columns],
+        affectedEdgeCount: tracker.affectedEdgeCount,
+        writeObservationIds: [...tracker.writeObservationIds],
+        materializationRecords: tracker.materializationRecords,
+      }),
+    );
   }
 
   for (const statementId of writeObservationByStatement.keys()) {
@@ -1071,18 +1186,20 @@ function projectTaskLocalFromFacts(input: {
     )) {
       if (!control.field) continue;
       const writeObservationId =
-        writeObservationByStatement.get(control.statementId)
-        ?? writeObservationByStatement.get(statementId);
+        writeObservationByStatement.get(control.statementId) ??
+        writeObservationByStatement.get(statementId);
       const targetWriteNode = writeObservationId
         ? targetWriteNodes.get(writeObservationId)
         : undefined;
       if (!targetWriteNode) continue;
       if (control.controlSide === "BOTH") {
-        pushGap(controlSideGap({
-          taskId,
-          relationId: control.relationId ?? "unresolved",
-          controlId: control.controlId,
-        }));
+        pushGap(
+          controlSideGap({
+            taskId,
+            relationId: control.relationId ?? "unresolved",
+            controlId: control.controlId,
+          }),
+        );
       }
       const fromNodeId = ensureFieldNode(nodes, control.field, catalog);
       pushEdge({
@@ -1104,8 +1221,12 @@ function projectTaskLocalFromFacts(input: {
           writeObservationId,
           joinType: control.joinType ?? "N/A",
           controlSide: control.controlSide ?? "N/A",
-          ...(control.leftRelationId ? { leftRelationId: control.leftRelationId } : {}),
-          ...(control.rightRelationId ? { rightRelationId: control.rightRelationId } : {}),
+          ...(control.leftRelationId
+            ? { leftRelationId: control.leftRelationId }
+            : {}),
+          ...(control.rightRelationId
+            ? { rightRelationId: control.rightRelationId }
+            : {}),
         },
       });
     }
@@ -1138,7 +1259,9 @@ function projectTaskLocalFromFacts(input: {
   });
 }
 
-export function projectTaskLocal(options: ProjectTaskLocalOptions): TaskLocalProjection {
+export function projectTaskLocal(
+  options: ProjectTaskLocalOptions,
+): TaskLocalProjection {
   const taskId = options.taskId.trim();
   const factsRoot = resolve(options.factsRoot);
   const dataRoot = resolve(options.dataRoot);

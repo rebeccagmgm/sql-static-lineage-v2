@@ -6,13 +6,12 @@ import {
   type UnionContinuationIndexCandidate,
   type UnionContinuationIndexEntry,
 } from "../../../scripts/reconcile/consumer/target-table-upstream-causal-closure/union-continuation-candidate-source.ts";
-import { canonicalJson, sha256 } from "../../../scripts/machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../src/contracts/sha256.js";
 import type { ContinuationPorts } from "../../../scripts/project-graph/field-evidence-v1/continuation/ports.ts";
 import { buildFieldEdgeIndex } from "../../../scripts/project-graph/field-evidence-v1/field-edge-index.ts";
 import { resolveReadField } from "../../../scripts/project-graph/field-evidence-v1/resolve-read-field.ts";
-import {
-  createHoraeScheduleRelationLookupFromScheduleEdges,
-} from "../../../scripts/project-graph/field-evidence-v1/schedule-preference.ts";
+import { createHoraeScheduleRelationLookupFromScheduleEdges } from "../../../scripts/project-graph/field-evidence-v1/schedule-preference.ts";
 import type { TaskLocalProjection } from "../../../scripts/project-graph/task-local/contract.ts";
 
 function continuationPorts(
@@ -21,7 +20,10 @@ function continuationPorts(
   return {
     scheduleLookup: lookup,
     writerCatalog: null,
-    readScopeFor: () => ({ kind: "UNAVAILABLE", reasonCode: "READ_SCOPE_UNAVAILABLE" }),
+    readScopeFor: () => ({
+      kind: "UNAVAILABLE",
+      reasonCode: "READ_SCOPE_UNAVAILABLE",
+    }),
     tableIdentityFor: ({ qualifiedName }) => ({
       platform: "warehouse",
       dataSource: "default",
@@ -75,7 +77,10 @@ function index(entries: readonly UnionContinuationIndexEntry[]) {
     generatedAt: "2026-09-04T00:00:00.000Z",
     input: {
       batchManifestRef: { contentHash: "batch-hash" },
-      producerIndex: { contentHash: "producer-hash", inputFingerprint: "input-hash" },
+      producerIndex: {
+        contentHash: "producer-hash",
+        inputFingerprint: "input-hash",
+      },
       taskProjections: [],
     },
     entries,
@@ -119,27 +124,31 @@ function projectionWithBinding(input: {
         properties: { writeObservationId: input.writeObservationId },
       },
     ],
-    edges: [{
-      edgeId: "edge:field-direct:1",
-      edgeType: "FIELD_DIRECT",
-      fromNodeId: fieldNodeId,
-      toNodeId: targetWriteNodeId,
-      properties: {
-        outputColumn: input.outputColumn,
-        expressionId: "expr:1",
-        sourceReadOccurrenceId: input.readOccurrenceId,
-        sourceReadOccurrenceStatus: "RESOLVED",
-        sourceRelationId: "relation:read:1",
-        subtype: "IDENTITY",
+    edges: [
+      {
+        edgeId: "edge:field-direct:1",
+        edgeType: "FIELD_DIRECT",
+        fromNodeId: fieldNodeId,
+        toNodeId: targetWriteNodeId,
+        properties: {
+          outputColumn: input.outputColumn,
+          expressionId: "expr:1",
+          sourceReadOccurrenceId: input.readOccurrenceId,
+          sourceReadOccurrenceStatus: "RESOLVED",
+          sourceRelationId: "relation:read:1",
+          subtype: "IDENTITY",
+        },
       },
-    }],
+    ],
     localClosure: {
-      finalWrites: [{
-        writeObservationId: input.writeObservationId,
-        targetWriteNodeId,
-        datasetNodeId: "dataset:target",
-        qualifiedName: "warehouse.target_table",
-      }],
+      finalWrites: [
+        {
+          writeObservationId: input.writeObservationId,
+          targetWriteNodeId,
+          datasetNodeId: "dataset:target",
+          qualifiedName: "warehouse.target_table",
+        },
+      ],
       externalReads: [],
       localFieldPaths: [],
     },
@@ -149,14 +158,19 @@ function projectionWithBinding(input: {
 
 describe("resolveReadField", () => {
   const consumerTaskId = "consumer-x";
-  const readOccurrenceId = "task:consumer-x:statement:0:relation:root.read.example";
+  const readOccurrenceId =
+    "task:consumer-x:statement:0:relation:root.read.example";
   const column = "amount";
 
   it("returns CONFIRMED for a unique continuationEligible candidate with producer binding", () => {
     const writeObservationId = "write-observation:producer-a:0";
-    const source = createUnionContinuationCandidateSource(index([
-      entry(consumerTaskId, readOccurrenceId, [candidate({ writeObservationId })]),
-    ]));
+    const source = createUnionContinuationCandidateSource(
+      index([
+        entry(consumerTaskId, readOccurrenceId, [
+          candidate({ writeObservationId }),
+        ]),
+      ]),
+    );
     const producerProjection = projectionWithBinding({
       taskId: "producer-a",
       writeObservationId,
@@ -169,7 +183,9 @@ describe("resolveReadField", () => {
       column,
       index: source,
       producerIndexForTask: (taskId) =>
-        taskId === "producer-a" ? buildFieldEdgeIndex({ projection: producerProjection }) : null,
+        taskId === "producer-a"
+          ? buildFieldEdgeIndex({ projection: producerProjection })
+          : null,
       continuationPorts: continuationPorts(null),
     });
     expect(resolved.kind).toBe("CONFIRMED");
@@ -179,12 +195,17 @@ describe("resolveReadField", () => {
   });
 
   it("returns FRONTIER for multiple candidates", () => {
-    const source = createUnionContinuationCandidateSource(index([
-      entry(consumerTaskId, readOccurrenceId, [
-        candidate({ taskId: "producer-a" }),
-        candidate({ taskId: "producer-b", writeObservationId: "write-observation:producer-b:0" }),
+    const source = createUnionContinuationCandidateSource(
+      index([
+        entry(consumerTaskId, readOccurrenceId, [
+          candidate({ taskId: "producer-a" }),
+          candidate({
+            taskId: "producer-b",
+            writeObservationId: "write-observation:producer-b:0",
+          }),
+        ]),
       ]),
-    ]));
+    );
     const resolved = resolveReadField({
       consumerTaskId,
       readOccurrenceId,
@@ -200,17 +221,23 @@ describe("resolveReadField", () => {
     const lookup = createHoraeScheduleRelationLookupFromScheduleEdges([
       { consumerTaskId, producerTaskId: "producer-b" },
     ]);
-    const source = createUnionContinuationCandidateSource(index([
-      entry(consumerTaskId, readOccurrenceId, [
-        candidate({ taskId: "producer-a", l1Eligible: false, partitionMatchStatus: "UNKNOWN" }),
-        candidate({
-          taskId: "producer-b",
-          writeObservationId: "write-observation:producer-b:0",
-          l1Eligible: false,
-          partitionMatchStatus: "UNKNOWN",
-        }),
+    const source = createUnionContinuationCandidateSource(
+      index([
+        entry(consumerTaskId, readOccurrenceId, [
+          candidate({
+            taskId: "producer-a",
+            l1Eligible: false,
+            partitionMatchStatus: "UNKNOWN",
+          }),
+          candidate({
+            taskId: "producer-b",
+            writeObservationId: "write-observation:producer-b:0",
+            l1Eligible: false,
+            partitionMatchStatus: "UNKNOWN",
+          }),
+        ]),
       ]),
-    ]));
+    );
     const resolved = resolveReadField({
       consumerTaskId,
       readOccurrenceId,
@@ -232,17 +259,23 @@ describe("resolveReadField", () => {
     const lookup = createHoraeScheduleRelationLookupFromScheduleEdges([
       { consumerTaskId, producerTaskId: "producer-b" },
     ]);
-    const source = createUnionContinuationCandidateSource(index([
-      entry(consumerTaskId, readOccurrenceId, [
-        candidate({ taskId: "producer-a", l1Eligible: false, partitionMatchStatus: "ASSUMED" }),
-        candidate({
-          taskId: "producer-b",
-          writeObservationId: "write-observation:producer-b:0",
-          l1Eligible: false,
-          partitionMatchStatus: "ASSUMED",
-        }),
+    const source = createUnionContinuationCandidateSource(
+      index([
+        entry(consumerTaskId, readOccurrenceId, [
+          candidate({
+            taskId: "producer-a",
+            l1Eligible: false,
+            partitionMatchStatus: "ASSUMED",
+          }),
+          candidate({
+            taskId: "producer-b",
+            writeObservationId: "write-observation:producer-b:0",
+            l1Eligible: false,
+            partitionMatchStatus: "ASSUMED",
+          }),
+        ]),
       ]),
-    ]));
+    );
     const resolved = resolveReadField({
       consumerTaskId,
       readOccurrenceId,
@@ -253,17 +286,24 @@ describe("resolveReadField", () => {
     });
     expect(resolved.kind).toBe("FRONTIER");
     if (resolved.kind === "FRONTIER") {
-      expect(resolved.candidates.map((entry) => entry.taskId)).toEqual(["producer-b"]);
+      expect(resolved.candidates.map((entry) => entry.taskId)).toEqual([
+        "producer-b",
+      ]);
     }
   });
 
   it("does not schedule-prune when Horae lookup is unavailable", () => {
-    const source = createUnionContinuationCandidateSource(index([
-      entry(consumerTaskId, readOccurrenceId, [
-        candidate({ taskId: "producer-a" }),
-        candidate({ taskId: "producer-b", writeObservationId: "write-observation:producer-b:0" }),
+    const source = createUnionContinuationCandidateSource(
+      index([
+        entry(consumerTaskId, readOccurrenceId, [
+          candidate({ taskId: "producer-a" }),
+          candidate({
+            taskId: "producer-b",
+            writeObservationId: "write-observation:producer-b:0",
+          }),
+        ]),
       ]),
-    ]));
+    );
     const resolved = resolveReadField({
       consumerTaskId,
       readOccurrenceId,
@@ -293,9 +333,13 @@ describe("resolveReadField", () => {
 
   it("returns NO_BINDING when producer has no matching field edge", () => {
     const writeObservationId = "write-observation:producer-a:0";
-    const source = createUnionContinuationCandidateSource(index([
-      entry(consumerTaskId, readOccurrenceId, [candidate({ writeObservationId })]),
-    ]));
+    const source = createUnionContinuationCandidateSource(
+      index([
+        entry(consumerTaskId, readOccurrenceId, [
+          candidate({ writeObservationId }),
+        ]),
+      ]),
+    );
     const emptyProducer = projectionWithBinding({
       taskId: "producer-a",
       writeObservationId,
@@ -307,7 +351,8 @@ describe("resolveReadField", () => {
       readOccurrenceId,
       column,
       index: source,
-      producerIndexForTask: () => buildFieldEdgeIndex({ projection: emptyProducer }),
+      producerIndexForTask: () =>
+        buildFieldEdgeIndex({ projection: emptyProducer }),
       continuationPorts: continuationPorts(null),
     });
     expect(resolved.kind).toBe("NO_BINDING");

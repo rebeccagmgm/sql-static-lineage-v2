@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { canonicalInputPackHash as canonicalHash } from "../src/contracts/canonical-json.js";
+import { sha256Hex as sha256Text } from "../src/contracts/sha256.js";
 import {
-  canonicalHash,
-  sha256Text,
   type JsonValue,
 } from "../scripts/input/shared/input-pack.ts";
 import { repairStoredInputPacks } from "../scripts/input/repair/repair-stored-input-packs.ts";

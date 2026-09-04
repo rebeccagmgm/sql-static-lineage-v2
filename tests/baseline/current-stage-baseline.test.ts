@@ -4,20 +4,18 @@ import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { canonicalMachineFactsJson as canonicalJson } from "../../src/contracts/canonical-json.js";
 import {
-  canonicalJson,
-  MACHINE_FACTS_CONTRACT_VERSION,
-  sha256,
-} from "../../scripts/machine-facts/machine-facts-contract.ts";
+  taskLocalPhysicalDatasetNodeId as physicalDatasetNodeId,
+  taskLocalPhysicalFieldNodeId as fieldEvidencePhysicalFieldNodeId,
+  taskLocalReadOccurrenceNodeId as readOccurrenceNodeId,
+  taskLocalTargetWriteNodeId as targetWriteNodeId,
+  taskNodeId,
+} from "../../src/contracts/identity.js";
+import { sha256Hex as sha256 } from "../../src/contracts/sha256.js";
+import { MACHINE_FACTS_CONTRACT_VERSION } from "../../scripts/machine-facts/machine-facts-contract.ts";
 import { runInputPackMachineFacts } from "../../scripts/machine-facts/input-pack-machine-facts.ts";
 import type { InputPackMachineFactsRunResult } from "../../scripts/machine-facts/input-pack-machine-facts.ts";
-import {
-  fieldEvidencePhysicalFieldNodeId,
-  physicalDatasetNodeId,
-  readOccurrenceNodeId,
-  targetWriteNodeId,
-  taskNodeId,
-} from "../../scripts/project-graph/task-local/ids.ts";
 import {
   TASK_LOCAL_PROJECTION_SCHEMA_VERSION,
   taskLocalProjectionContentHash,

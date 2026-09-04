@@ -1,7 +1,5 @@
-import {
-  canonicalJson,
-  sha256,
-} from "../../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 import {
   isOutOfScopePhysicalRead,
   isSameTaskScratchProducerBridge,

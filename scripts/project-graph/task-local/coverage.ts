@@ -1,3 +1,4 @@
+import { taskNodeId } from "../../../src/contracts/identity.js";
 import type { CurrentBundleLoad } from "../../query/current-task-bundle.ts";
 import {
   canonicalizeTaskLocalProjection,
@@ -5,13 +6,17 @@ import {
   type TaskLocalFailureReasonCode,
   type TaskLocalProjection,
 } from "./contract.ts";
-import { taskNodeId } from "./ids.ts";
 import type { TaskScheduleContext } from "./schedule-context.ts";
 
-export function failureReasonFromLoad(load: CurrentBundleLoad): TaskLocalFailureReasonCode {
-  if (load.issues.some((issue) => issue.startsWith("TASK_NOT_INDEXED"))) return "FACTS_UNAVAILABLE";
-  if (load.issues.some((issue) => issue.startsWith("CURRENT_INDEX_MISSING"))) return "FACTS_UNAVAILABLE";
-  if (load.issues.some((issue) => issue.startsWith("STATUS_OR_MANIFEST"))) return "FACTS_STALE";
+export function failureReasonFromLoad(
+  load: CurrentBundleLoad,
+): TaskLocalFailureReasonCode {
+  if (load.issues.some((issue) => issue.startsWith("TASK_NOT_INDEXED")))
+    return "FACTS_UNAVAILABLE";
+  if (load.issues.some((issue) => issue.startsWith("CURRENT_INDEX_MISSING")))
+    return "FACTS_UNAVAILABLE";
+  if (load.issues.some((issue) => issue.startsWith("STATUS_OR_MANIFEST")))
+    return "FACTS_STALE";
   if (load.state === "INVALID") return "FACTS_INVALID";
   if (load.state === "STALE") return "FACTS_STALE";
   return "FACTS_UNAVAILABLE";
@@ -32,8 +37,10 @@ export function taskNodeProperties(input: {
   const properties: Record<string, unknown> = {};
   const taskName = input.schedule?.taskName ?? input.packTaskName ?? null;
   if (taskName) properties.taskName = taskName;
-  if (input.schedule?.topicName) properties.topicName = input.schedule.topicName;
-  if (input.schedule) properties.scheduleReference = input.schedule.scheduleReference;
+  if (input.schedule?.topicName)
+    properties.topicName = input.schedule.topicName;
+  if (input.schedule)
+    properties.scheduleReference = input.schedule.scheduleReference;
   return properties;
 }
 
@@ -49,11 +56,13 @@ export function buildScheduleOnlyProjection(input: {
     taskId: input.taskId,
     coverageStatus: "SCHEDULE_ONLY",
     failureReasonCode: null,
-    nodes: [{
-      nodeId: taskNodeId(input.taskId),
-      nodeType: "TASK",
-      properties: taskNodeProperties({ schedule: input.schedule }),
-    }],
+    nodes: [
+      {
+        nodeId: taskNodeId(input.taskId),
+        nodeType: "TASK",
+        properties: taskNodeProperties({ schedule: input.schedule }),
+      },
+    ],
     edges: [],
     gaps: [],
   });
@@ -72,11 +81,13 @@ export function buildCollectionFailedProjection(input: {
     taskId: input.taskId,
     coverageStatus: "COLLECTION_FAILED",
     failureReasonCode: input.failureReasonCode,
-    nodes: [{
-      nodeId: taskNodeId(input.taskId),
-      nodeType: "TASK",
-      properties: input.taskProperties ?? {},
-    }],
+    nodes: [
+      {
+        nodeId: taskNodeId(input.taskId),
+        nodeType: "TASK",
+        properties: input.taskProperties ?? {},
+      },
+    ],
     edges: [],
     gaps: [],
   });

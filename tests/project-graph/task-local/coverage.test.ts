@@ -4,9 +4,14 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { canonicalMachineFactsJson as canonicalJson } from "../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../src/contracts/sha256.js";
 import { runInputPackMachineFacts } from "../../../scripts/machine-facts/input-pack-machine-facts.ts";
-import { canonicalJson, sha256 } from "../../../scripts/machine-facts/machine-facts-contract.ts";
-import { hashJsonlStore, readJsonlRecords, writeCanonicalJsonl } from "../../../scripts/machine-facts/jsonl-store.ts";
+import {
+  hashJsonlStore,
+  readJsonlRecords,
+  writeCanonicalJsonl,
+} from "../../../scripts/machine-facts/jsonl-store.ts";
 import {
   writeTableInput,
   writeTaskInput,
@@ -100,8 +105,17 @@ function refreshAttestation(factsRoot: string, taskId: string): void {
   });
   writeFileSync(manifestPath, canonicalJson(manifest), "utf8");
   const manifestHash = sha256(readFileSync(manifestPath));
-  const statusPath = join(factsRoot, "registry", "tasks", taskId, "analysis-status.json");
-  const status = JSON.parse(readFileSync(statusPath, "utf8")) as Record<string, unknown>;
+  const statusPath = join(
+    factsRoot,
+    "registry",
+    "tasks",
+    taskId,
+    "analysis-status.json",
+  );
+  const status = JSON.parse(readFileSync(statusPath, "utf8")) as Record<
+    string,
+    unknown
+  >;
   status.current_manifest_sha256 = manifestHash;
   writeFileSync(statusPath, canonicalJson(status), "utf8");
   const indexPath = join(factsRoot, "indexes", "task-fact-index.jsonl");
@@ -114,7 +128,11 @@ function refreshAttestation(factsRoot: string, taskId: string): void {
     indexPath,
     `${rows
       .map((row) =>
-        canonicalJson(row.task_id === taskId ? { ...row, manifest_sha256: manifestHash } : row),
+        canonicalJson(
+          row.task_id === taskId
+            ? { ...row, manifest_sha256: manifestHash }
+            : row,
+        ),
       )
       .join("\n")}\n`,
     "utf8",
@@ -290,7 +308,9 @@ describe("task-local coverage states", () => {
     });
     expect(summarizeTaskLocalBatch(batch.projections)).toEqual(batch.summary);
 
-    const byTaskId = new Map(batch.projections.map((projection) => [projection.taskId, projection]));
+    const byTaskId = new Map(
+      batch.projections.map((projection) => [projection.taskId, projection]),
+    );
     expect(byTaskId.get("105387")?.coverageStatus).toBe("PROJECTED");
     expect(byTaskId.get("888002")?.coverageStatus).toBe("SCHEDULE_ONLY");
     expect(byTaskId.get("777002")?.coverageStatus).toBe("COLLECTION_FAILED");

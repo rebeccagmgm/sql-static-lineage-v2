@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -10,6 +10,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+
+import { sha256File } from "../../../src/adapters/files/sha256-file.js";
+import { canonicalInputPackHash } from "../../../src/contracts/canonical-json.js";
+import { sha256Hex } from "../../../src/contracts/sha256.js";
 
 export const INPUT_PACK_SCHEMA_VERSION = "1.0.0" as const;
 export const SQL_SLOTS = [
@@ -706,45 +710,6 @@ function isStructuredTaskPartitionEvidence(
   );
 }
 
-export function canonicalJson(value: JsonValue): string {
-  if (value === null || typeof value === "boolean" || typeof value === "string")
-    return JSON.stringify(value);
-  if (typeof value === "number") {
-    if (!Number.isFinite(value))
-      fail("canonical JSON cannot contain non-finite numbers");
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  return `{${Object.keys(value)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key]!)}`)
-    .join(",")}}`;
-}
-
-export function sha256Bytes(value: Uint8Array): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-export function sha256Text(value: string): string {
-  return sha256Bytes(Buffer.from(value, "utf8"));
-}
-
-export function sha256File(path: string): string {
-  return sha256Bytes(readFileSync(path));
-}
-
-export function canonicalHash(
-  value: JsonValue,
-  excludedFields: readonly string[] = [],
-): string {
-  if (!isObject(value)) fail("canonicalHash requires a JSON object");
-  const excluded = new Set(excludedFields);
-  const filtered: JsonObject = {};
-  for (const [key, item] of Object.entries(value))
-    if (!excluded.has(key)) filtered[key] = item as JsonValue;
-  return sha256Text(canonicalJson(filtered));
-}
-
 export function stableTableId(
   evidence: Pick<
     TableEvidence,
@@ -888,13 +853,13 @@ export function createTaskDocument(evidence: TaskEvidence): TaskDocument {
   const sqlFiles = built.sql.map(({ slot, content, evidenceProvider }) => ({
     slot,
     path: `sql/${slot}.sql`,
-    sha256: sha256Text(content),
+    sha256: sha256Hex(content),
     evidenceProvider,
   }));
   const withoutHash = { ...built.document, sqlFiles } as JsonObject;
   const document = {
     ...withoutHash,
-    contentHash: canonicalHash(withoutHash, ["collectedAt", "contentHash"]),
+    contentHash: canonicalInputPackHash(withoutHash, ["collectedAt", "contentHash"]),
   } as TaskDocument;
   validateTaskDocument(document);
   return document;
@@ -1041,7 +1006,7 @@ export function validateTaskDocument(
   requireNonEmpty(String(document.collectedAt), "task.collectedAt");
   validateHash(document.contentHash, "task.contentHash");
   if (
-    canonicalHash(document as JsonObject, ["collectedAt", "contentHash"]) !==
+    canonicalInputPackHash(document as JsonObject, ["collectedAt", "contentHash"]) !==
     document.contentHash
   )
     fail("task.contentHash does not match document");
@@ -1071,7 +1036,7 @@ function buildTableDocument(evidence: TableEvidence): {
     objectType,
     ddlFile: {
       path: "ddl.sql",
-      sha256: sha256Text(ddl),
+      sha256: sha256Hex(ddl),
       evidenceProvider: requireNonEmpty(
         evidence.evidenceProvider,
         "evidenceProvider",
@@ -1125,7 +1090,7 @@ export function createTableDocument(evidence: TableEvidence): TableDocument {
   const built = buildTableDocument(evidence);
   const document = {
     ...built.document,
-    contentHash: canonicalHash(built.document, ["collectedAt", "contentHash"]),
+    contentHash: canonicalInputPackHash(built.document, ["collectedAt", "contentHash"]),
   } as TableDocument;
   validateTableDocument(document);
   return document;
@@ -1209,7 +1174,7 @@ export function validateTableDocument(
   requireNonEmpty(String(document.collectedAt), "table.collectedAt");
   validateHash(document.contentHash, "table.contentHash");
   if (
-    canonicalHash(document as JsonObject, ["collectedAt", "contentHash"]) !==
+    canonicalInputPackHash(document as JsonObject, ["collectedAt", "contentHash"]) !==
     document.contentHash
   )
     fail("table.contentHash does not match document");

@@ -4,10 +4,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  canonicalJson,
-  sha256,
-} from "../../scripts/machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../src/contracts/sha256.js";
 import type {
   CandidateBranch,
   CandidateUniverse,
@@ -360,9 +358,7 @@ describe("closure-on-union C2", () => {
     const boundary = result.universe.branches.find(
       (branch) => branch.branchKind === "UNBOUND_READ",
     );
-    expect(boundary?.boundaryReason).toBe(
-      "SELF_READ_NOT_EXTERNAL",
-    );
+    expect(boundary?.boundaryReason).toBe("SELF_READ_NOT_EXTERNAL");
     expect(boundary?.gapRefs).toContain(
       "continuation-gap:legacy:task:root:statement:0:relation:self-read:SELF_READ_NOT_EXTERNAL",
     );
@@ -370,12 +366,11 @@ describe("closure-on-union C2", () => {
 
   it("intersects INDEX candidates with the raw schedule relation before projection", () => {
     const readId = "task:root:statement:0:relation:indexed";
-    const candidates = ["103234", "103235", "103236", "103237"].map(
-      (taskId) =>
-        candidate({
-          taskId,
-          writeObservationId: `write-observation:${taskId}:0`,
-        }),
+    const candidates = ["103234", "103235", "103236", "103237"].map((taskId) =>
+      candidate({
+        taskId,
+        writeObservationId: `write-observation:${taskId}:0`,
+      }),
     );
     const result = projectUnionV2CandidateUniverse({
       rootTaskId: "root",

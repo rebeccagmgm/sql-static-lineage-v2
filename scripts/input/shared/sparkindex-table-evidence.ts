@@ -7,13 +7,13 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { sha256File } from "../../../src/adapters/files/sha256-file.js";
+import { sha256Hex as sha256Text } from "../../../src/contracts/sha256.js";
 import {
   materializeTaskAndTablePacks,
   type TaskTableMaterializationResult,
 } from "./task-table-materialization.ts";
 import {
-  sha256File,
-  sha256Text,
   validateTableDocument,
   type SqlSlot,
   type TableEvidence,

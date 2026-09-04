@@ -10,10 +10,8 @@ import {
 import { randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 
-import {
-  canonicalJson,
-  sha256,
-} from "../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../src/contracts/sha256.js";
 import { resolveScheduleEvidenceCacheRoot } from "../../reconcile/consumer/one-hop/schedule-evidence-cache.ts";
 
 export const SZDATA_SCHEDULE_DETAIL_CACHE_SCHEMA_VERSION = "1.0.0" as const;
@@ -206,15 +204,18 @@ function validateDetail(
         return { reason: "SQL_PREVIEW_FIELD_PRESENT" };
       continue;
     }
-    if (!(SQL_SLOTS as readonly string[]).some((slot) =>
-      SQL_FIELD_ALIASES[slot as SqlSlot]?.includes(key),
-    ))
+    if (
+      !(SQL_SLOTS as readonly string[]).some((slot) =>
+        SQL_FIELD_ALIASES[slot as SqlSlot]?.includes(key),
+      )
+    )
       continue;
     if (rawValue === null || rawValue === undefined || rawValue === "-")
       continue;
     if (typeof rawValue !== "string")
       return { reason: `SQL_${key.toUpperCase()}_NOT_STRING` };
-    if (rawValue.trim() === "") return { reason: `SQL_${key.toUpperCase()}_EMPTY` };
+    if (rawValue.trim() === "")
+      return { reason: `SQL_${key.toUpperCase()}_EMPTY` };
     if (containsTruncationMarker(rawValue))
       return { reason: `SQL_${key.toUpperCase()}_TRUNCATED` };
   }
@@ -264,7 +265,10 @@ export function readSzdataScheduleDetailCache(
       return invalid(path, "PROVENANCE_MISMATCH");
     const detailResult = validateDetail(record.detail, taskId);
     if ("reason" in detailResult) return invalid(path, detailResult.reason);
-    if (typeof record.content_sha256 !== "string" || !SHA256.test(record.content_sha256))
+    if (
+      typeof record.content_sha256 !== "string" ||
+      !SHA256.test(record.content_sha256)
+    )
       return invalid(path, "CONTENT_HASH_INVALID");
     const expectedHash = sha256(
       canonicalJson(payload(taskId, observedAt, detailResult.detail)),
@@ -300,10 +304,14 @@ export function writeSzdataScheduleDetailCache(
   const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
   mkdirSync(dirname(path), { recursive: true });
   try {
-    writeFileSync(temporaryPath, canonicalJson(document(taskId, observedAt, detail)), {
-      encoding: "utf8",
-      flag: "wx",
-    });
+    writeFileSync(
+      temporaryPath,
+      canonicalJson(document(taskId, observedAt, detail)),
+      {
+        encoding: "utf8",
+        flag: "wx",
+      },
+    );
     renameSync(temporaryPath, path);
     return path;
   } finally {
@@ -316,7 +324,8 @@ function readPath(record: JsonRecord, path: string): unknown {
   let current: unknown = record;
   for (const part of path.split(".")) {
     const object = asRecord(current);
-    if (!object || !Object.prototype.hasOwnProperty.call(object, part)) return undefined;
+    if (!object || !Object.prototype.hasOwnProperty.call(object, part))
+      return undefined;
     current = object[part];
   }
   return current;
@@ -335,13 +344,17 @@ function sourceContainers(record: JsonRecord): readonly JsonRecord[] {
 
 function extensionValue(record: JsonRecord, names: readonly string[]): unknown {
   for (const container of sourceContainers(record)) {
-    const extensions = container.taskext ?? container.taskExt ?? container.task_ext;
+    const extensions =
+      container.taskext ?? container.taskExt ?? container.task_ext;
     if (!Array.isArray(extensions)) continue;
     for (const item of extensions) {
       const extension = asRecord(item);
       if (!extension) continue;
       const name = nonEmptyString(
-        extension.prop_name ?? extension.propName ?? extension.name ?? extension.prop,
+        extension.prop_name ??
+          extension.propName ??
+          extension.name ??
+          extension.prop,
       );
       if (!name || !names.includes(name)) continue;
       return extension.prop_value ?? extension.propValue ?? extension.value;
@@ -371,9 +384,12 @@ function candidateValues(
 
 function textFromValue(value: unknown): string | undefined {
   if (typeof value === "string") return nonEmptyString(value);
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
   if (Array.isArray(value)) {
-    const parts = value.map(textFromValue).filter((part): part is string => part !== undefined);
+    const parts = value
+      .map(textFromValue)
+      .filter((part): part is string => part !== undefined);
     return parts.length === 0 ? undefined : parts.join("\n");
   }
   const record = asRecord(value);
@@ -432,7 +448,10 @@ function targetText(record: JsonRecord): string | undefined {
   return undefined;
 }
 
-function targetSide(record: JsonRecord, side: "database" | "tableName"): string | undefined {
+function targetSide(
+  record: JsonRecord,
+  side: "database" | "tableName",
+): string | undefined {
   const fields =
     side === "database"
       ? ["database", "databaseName", "target.database", "hive.database"]
@@ -440,7 +459,10 @@ function targetSide(record: JsonRecord, side: "database" | "tableName"): string 
   return firstText(candidateValues(record, fields));
 }
 
-function taskValue(record: JsonRecord, fields: readonly string[]): string | undefined {
+function taskValue(
+  record: JsonRecord,
+  fields: readonly string[],
+): string | undefined {
   const expanded = fields.flatMap((field) => [field, `task.${field}`]);
   return firstText(candidateValues(record, expanded));
 }
@@ -456,7 +478,9 @@ function sqlText(value: unknown): string | undefined {
   if (typeof value === "string")
     return value.trim() === "" || value.trim() === "-" ? undefined : value;
   if (Array.isArray(value)) {
-    const parts = value.map(sqlText).filter((part): part is string => part !== undefined);
+    const parts = value
+      .map(sqlText)
+      .filter((part): part is string => part !== undefined);
     return parts.length === 0 ? undefined : parts.join("\n");
   }
   const record = asRecord(value);
@@ -468,10 +492,7 @@ function sqlText(value: unknown): string | undefined {
   return undefined;
 }
 
-function sqlCandidates(
-  record: JsonRecord,
-  slot: SqlSlot,
-): SqlCandidate[] {
+function sqlCandidates(record: JsonRecord, slot: SqlSlot): SqlCandidate[] {
   const fields = SQL_FIELD_ALIASES[slot];
   const previewFields = fields.map((field) => `${field}Preview`);
   const nestedFields: readonly string[] =
@@ -532,7 +553,8 @@ function selectSql(record: JsonRecord, slot: SqlSlot): string | undefined {
   const selected = full.length > 0 ? full : candidates;
   if (selected.length === 0) return undefined;
   const values = [...new Set(selected.map((candidate) => candidate.value))];
-  if (values.length > 1) throw new Error(`SZDATA_SCHEDULE_DETAIL_SQL_CONFLICT:${slot}`);
+  if (values.length > 1)
+    throw new Error(`SZDATA_SCHEDULE_DETAIL_SQL_CONFLICT:${slot}`);
   const value = values[0]!;
   if (containsTruncationMarker(value))
     throw new Error(`SZDATA_SCHEDULE_DETAIL_SQL_TRUNCATED:${slot}`);
@@ -555,7 +577,8 @@ function unwrapScheduleDetail(value: unknown, taskId: string): JsonRecord {
   if (!object) throw new Error(`SZDATA_SCHEDULE_DETAIL_EMPTY:${taskId}`);
   for (const key of ["data", "rows", "result"]) {
     const nested = object[key];
-    if (Array.isArray(nested) || asRecord(nested)) return unwrapScheduleDetail(nested, taskId);
+    if (Array.isArray(nested) || asRecord(nested))
+      return unwrapScheduleDetail(nested, taskId);
   }
   return object;
 }
@@ -564,8 +587,21 @@ const METADATA_FIELDS: Readonly<Record<string, readonly string[]>> = {
   taskName: ["taskName", "task_name", "task.name"],
   taskDesc: ["taskDesc", "task_desc", "task.desc"],
   status: ["status", "taskStatus", "task_status", "task.status"],
-  taskType: ["taskType", "task_type", "typeId", "type_id", "task.type", "task.task_type"],
-  topicName: ["topicName", "topic_name", "topic", "task.topicName", "task.topic_name"],
+  taskType: [
+    "taskType",
+    "task_type",
+    "typeId",
+    "type_id",
+    "task.type",
+    "task.task_type",
+  ],
+  topicName: [
+    "topicName",
+    "topic_name",
+    "topic",
+    "task.topicName",
+    "task.topic_name",
+  ],
   cycle: ["cycle", "scheduleCycle", "schedule_cycle", "task.cycle"],
   cycleUnit: ["cycleUnit", "cycle_unit", "task.cycleUnit", "task.cycle_unit"],
   cluster: ["cluster", "clusterName", "cluster_name", "task.cluster"],
@@ -576,19 +612,50 @@ const METADATA_FIELDS: Readonly<Record<string, readonly string[]>> = {
     "task.businessUsername",
     "task.business_username",
   ],
-  scenarioType: ["scenarioType", "scenario_type", "task.scenarioType", "task.scenario_type"],
-  scenarioDesc: ["scenarioDesc", "scenario_desc", "task.scenarioDesc", "task.scenario_desc"],
-  lastRunDate: ["lastRunDate", "last_run_date", "task.lastRunDate", "task.last_run_date"],
-  lastRunState: ["lastRunState", "last_run_state", "task.lastRunState", "task.last_run_state"],
+  scenarioType: [
+    "scenarioType",
+    "scenario_type",
+    "task.scenarioType",
+    "task.scenario_type",
+  ],
+  scenarioDesc: [
+    "scenarioDesc",
+    "scenario_desc",
+    "task.scenarioDesc",
+    "task.scenario_desc",
+  ],
+  lastRunDate: [
+    "lastRunDate",
+    "last_run_date",
+    "task.lastRunDate",
+    "task.last_run_date",
+  ],
+  lastRunState: [
+    "lastRunState",
+    "last_run_state",
+    "task.lastRunState",
+    "task.last_run_state",
+  ],
   lastRunStateName: [
     "lastRunStateName",
     "last_run_state_name",
     "task.lastRunStateName",
     "task.last_run_state_name",
   ],
-  lastEndTime: ["lastEndTime", "last_end_time", "task.lastEndTime", "task.last_end_time"],
+  lastEndTime: [
+    "lastEndTime",
+    "last_end_time",
+    "task.lastEndTime",
+    "task.last_end_time",
+  ],
   tryLimit: ["tryLimit", "try_limit", "task.tryLimit", "task.try_limit"],
-  source: ["source", "sourceTable", "source_table", "syncSource", "sync_source"],
+  source: [
+    "source",
+    "sourceTable",
+    "source_table",
+    "syncSource",
+    "sync_source",
+  ],
   hivePartition: ["hivePartition", "hive_partition", "partition"],
 };
 
@@ -602,17 +669,26 @@ export function normalizeSzdataScheduleDetail(
     record.error !== undefined ||
     record.success === false ||
     ["error", "failed", "failure"].includes(
-      String(record.status ?? "").trim().toLowerCase(),
+      String(record.status ?? "")
+        .trim()
+        .toLowerCase(),
     )
   ) {
     const detail =
       typeof record.error === "string"
         ? record.error
         : JSON.stringify(record.error ?? record);
-    throw new Error(`SZDATA_SCHEDULE_DETAIL_UPSTREAM_ERROR:${taskId}:${detail}`);
+    throw new Error(
+      `SZDATA_SCHEDULE_DETAIL_UPSTREAM_ERROR:${taskId}:${detail}`,
+    );
   }
   const returnedTaskId = firstText(
-    candidateValues(record, ["taskId", "task_id", "task.taskId", "task.task_id"]),
+    candidateValues(record, [
+      "taskId",
+      "task_id",
+      "task.taskId",
+      "task.task_id",
+    ]),
   );
   if (returnedTaskId !== undefined && returnedTaskId !== taskId)
     throw new Error(`SZDATA_SCHEDULE_DETAIL_TASK_ID_MISMATCH:${taskId}`);
@@ -628,8 +704,10 @@ export function normalizeSzdataScheduleDetail(
     detail.targetTable = target;
     const split = target.indexOf(".");
     if (split > 0) {
-      if (detail.database === undefined) detail.database = target.slice(0, split);
-      if (detail.tableName === undefined) detail.tableName = target.slice(split + 1);
+      if (detail.database === undefined)
+        detail.database = target.slice(0, split);
+      if (detail.tableName === undefined)
+        detail.tableName = target.slice(split + 1);
     }
   }
   const database = targetSide(record, "database");
@@ -725,12 +803,11 @@ export function runSzdataScheduleDetail(
     : process.platform === "win32"
       ? (process.env.ComSpec ?? "cmd.exe")
       : (process.env.OPENCLI_EXECUTABLE ?? "opencli");
-  const executableArgs =
-    useInstalledEntry
-      ? [installedEntry!, ...args]
-      : process.platform === "win32"
-        ? ["/d", "/s", "/c", "opencli.cmd", ...args]
-        : [...args];
+  const executableArgs = useInstalledEntry
+    ? [installedEntry!, ...args]
+    : process.platform === "win32"
+      ? ["/d", "/s", "/c", "opencli.cmd", ...args]
+      : [...args];
   const output = execFileSync(executable, executableArgs, {
     encoding: "utf8",
     windowsHide: true,
@@ -766,7 +843,9 @@ export class ScheduleDetailSerialGate {
     this.minIntervalMs =
       options.minIntervalMs ?? DEFAULT_SZDATA_SCHEDULE_DETAIL_MIN_INTERVAL_MS;
     if (!Number.isFinite(this.minIntervalMs) || this.minIntervalMs < 0)
-      throw new Error("SZDATA_SCHEDULE_DETAIL_MIN_INTERVAL_MUST_BE_NON_NEGATIVE");
+      throw new Error(
+        "SZDATA_SCHEDULE_DETAIL_MIN_INTERVAL_MUST_BE_NON_NEGATIVE",
+      );
     this.now = options.now ?? Date.now;
     this.sleep = options.sleep ?? sleepSynchronously;
   }

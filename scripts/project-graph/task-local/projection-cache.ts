@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { indexTaskInputPacks } from "../../machine-facts/input-pack-machine-facts.ts";
-import { canonicalJson, sha256 } from "../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../src/contracts/sha256.js";
 import {
   loadCurrentTaskBundle,
   type CurrentBundleLoad,
@@ -33,19 +34,27 @@ function text(value: unknown): string | null {
 }
 
 export function taskLocalCacheKey(parts: TaskLocalCacheKeyParts): string {
-  return sha256(canonicalJson({
-    taskId: parts.taskId,
-    packContentHash: parts.packContentHash,
-    factsManifestSha256: parts.factsManifestSha256,
-    schemaVersion: parts.schemaVersion,
-  }));
+  return sha256(
+    canonicalJson({
+      taskId: parts.taskId,
+      packContentHash: parts.packContentHash,
+      factsManifestSha256: parts.factsManifestSha256,
+      schemaVersion: parts.schemaVersion,
+    }),
+  );
 }
 
-export function packContentHashForTask(dataRoot: string, taskId: string): string {
+export function packContentHashForTask(
+  dataRoot: string,
+  taskId: string,
+): string {
   const paths = indexTaskInputPacks(dataRoot).get(taskId) ?? [];
   if (paths.length !== 1) return "NO_PACK";
   try {
-    const document = JSON.parse(readFileSync(paths[0]!, "utf8")) as Record<string, unknown>;
+    const document = JSON.parse(readFileSync(paths[0]!, "utf8")) as Record<
+      string,
+      unknown
+    >;
     return text(document.contentHash) ?? sha256(readFileSync(paths[0]!));
   } catch {
     return "NO_PACK";
@@ -53,9 +62,11 @@ export function packContentHashForTask(dataRoot: string, taskId: string): string
 }
 
 export function factsManifestFingerprint(load: CurrentBundleLoad): string {
-  return text(load.manifestSha256)
-    ?? text(load.indexRow?.manifest_sha256)
-    ?? "NO_FACTS";
+  return (
+    text(load.manifestSha256) ??
+    text(load.indexRow?.manifest_sha256) ??
+    "NO_FACTS"
+  );
 }
 
 export function resolveTaskLocalCacheKeyParts(input: {
@@ -72,8 +83,16 @@ export function resolveTaskLocalCacheKeyParts(input: {
   };
 }
 
-export function taskLocalProjectionPath(outputRoot: string, taskId: string): string {
-  return join(resolve(outputRoot), "tasks", taskId, "task-local-projection.json");
+export function taskLocalProjectionPath(
+  outputRoot: string,
+  taskId: string,
+): string {
+  return join(
+    resolve(outputRoot),
+    "tasks",
+    taskId,
+    "task-local-projection.json",
+  );
 }
 
 export function readTaskLocalCacheEnvelope(
@@ -83,8 +102,15 @@ export function readTaskLocalCacheEnvelope(
   const path = taskLocalProjectionPath(outputRoot, taskId);
   if (!existsSync(path)) return null;
   try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as Partial<TaskLocalCacheEnvelope>;
-    if (!parsed.cacheKey || !parsed.cacheKeyParts || !parsed.projection || !parsed.projectionContentHash) {
+    const parsed = JSON.parse(
+      readFileSync(path, "utf8"),
+    ) as Partial<TaskLocalCacheEnvelope>;
+    if (
+      !parsed.cacheKey ||
+      !parsed.cacheKeyParts ||
+      !parsed.projection ||
+      !parsed.projectionContentHash
+    ) {
       return null;
     }
     canonicalizeTaskLocalProjection(parsed.projection);
@@ -98,7 +124,10 @@ export function writeTaskLocalCacheEnvelope(
   outputRoot: string,
   envelope: TaskLocalCacheEnvelope,
 ): string {
-  const path = taskLocalProjectionPath(outputRoot, envelope.cacheKeyParts.taskId);
+  const path = taskLocalProjectionPath(
+    outputRoot,
+    envelope.cacheKeyParts.taskId,
+  );
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${canonicalJson(envelope)}\n`, "utf8");
   return path;

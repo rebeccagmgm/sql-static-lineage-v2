@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { sha256Hex as sha256 } from "../../../src/contracts/sha256.js";
 import { runInputPackMachineFacts } from "../../../scripts/machine-facts/input-pack-machine-facts.ts";
-import { sha256 } from "../../../scripts/machine-facts/machine-facts-contract.ts";
 import {
   writeTableInput,
   writeTaskInput,
@@ -20,8 +20,14 @@ import {
 
 function writeDemoTables(dataRoot: string): void {
   for (const table of [
-    { qualifiedName: "demo.stati", columns: "internal_trade_id STRING, stati_cont_desc STRING" },
-    { qualifiedName: "demo.trades", columns: "internal_trade_id STRING, v STRING" },
+    {
+      qualifiedName: "demo.stati",
+      columns: "internal_trade_id STRING, stati_cont_desc STRING",
+    },
+    {
+      qualifiedName: "demo.trades",
+      columns: "internal_trade_id STRING, v STRING",
+    },
   ]) {
     writeTableInput(dataRoot, {
       platform: "hive",
@@ -79,8 +85,13 @@ function setupProjectedTasks(taskIds: readonly string[]): {
 
 function mutatePackContentHash(dataRoot: string, taskId: string): string {
   const packPath = join(dataRoot, "tasks", "sparkIndex", taskId, "task.json");
-  const document = JSON.parse(readFileSync(packPath, "utf8")) as Record<string, unknown>;
-  document.contentHash = sha256(`mutated-pack:${taskId}:${String(document.contentHash)}`);
+  const document = JSON.parse(readFileSync(packPath, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  document.contentHash = sha256(
+    `mutated-pack:${taskId}:${String(document.contentHash)}`,
+  );
   writeFileSync(packPath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
   return String(document.contentHash);
 }
@@ -114,12 +125,16 @@ describe("task-local projection cache (TL-4)", () => {
         second.projections[0]!,
       ),
     ).toBe(true);
-    expect(second.projections[0]?.generatedAt).toBe(first.projections[0]?.generatedAt);
+    expect(second.projections[0]?.generatedAt).toBe(
+      first.projections[0]?.generatedAt,
+    );
   });
 
   it("misses only the task whose pack content hash changed", () => {
     const { dataRoot, factsRoot } = setupProjectedTasks(["200001", "200002"]);
-    const outputRoot = mkdtempSync(join(tmpdir(), "task-local-cache-multi-out-"));
+    const outputRoot = mkdtempSync(
+      join(tmpdir(), "task-local-cache-multi-out-"),
+    );
     const warm = projectTaskLocalBatch({
       dataRoot,
       factsRoot,
@@ -138,7 +153,9 @@ describe("task-local projection cache (TL-4)", () => {
       generatedAt: "2026-09-02T01:00:00.000Z",
     });
     expect(again.cache).toEqual({ hits: 1, misses: 1 });
-    const byTask = new Map(again.results.map((result) => [result.taskId, result]));
+    const byTask = new Map(
+      again.results.map((result) => [result.taskId, result]),
+    );
     expect(byTask.get("200001")?.cacheHit).toBe(false);
     expect(byTask.get("200002")?.cacheHit).toBe(true);
   });
@@ -151,7 +168,9 @@ describe("task-local projection cache (TL-4)", () => {
       factsRoot,
     });
     expect(before.schemaVersion).toBe("1.3.0");
-    expect(before.packContentHash).toBe(packContentHashForTask(dataRoot, "300001"));
+    expect(before.packContentHash).toBe(
+      packContentHashForTask(dataRoot, "300001"),
+    );
     expect(before.factsManifestSha256).not.toBe("NO_FACTS");
 
     const beforeKey = taskLocalCacheKey(before);

@@ -1,9 +1,13 @@
+import { physicalFieldKey } from "../../../src/contracts/identity.js";
 import { normalizeName } from "../../machine-facts/machine-facts-contract.ts";
 import type {
   PhysicalTableCatalog,
   PhysicalTableCatalogEntry,
 } from "../../machine-facts/input-pack-machine-facts.ts";
-import type { CurrentBundleLoad, JsonRecord } from "../../query/current-task-bundle.ts";
+import type {
+  CurrentBundleLoad,
+  JsonRecord,
+} from "../../query/current-task-bundle.ts";
 import {
   buildRelationTreeIndex,
   controlSideForJoin,
@@ -12,7 +16,6 @@ import {
 } from "../../project-graph/field-evidence-v1/relation-tree.ts";
 import { resolvePhysicalInputField } from "../consumer/field-lineage/physical-field-resolver.ts";
 import {
-  physicalFieldKey,
   type DatasetControlAnnotation,
   type DatasetControlGrain,
   type OpenLineageIndirectSubtype,
@@ -77,10 +80,10 @@ export function joinGrain(joinType: string): {
 } {
   const kind = joinType.toUpperCase();
   if (
-    kind.includes("LEFT")
-    || kind.includes("RIGHT")
-    || kind.includes("FULL")
-    || kind.includes("CROSS")
+    kind.includes("LEFT") ||
+    kind.includes("RIGHT") ||
+    kind.includes("FULL") ||
+    kind.includes("CROSS")
   ) {
     return {
       grain: "EXPAND_RISK",
@@ -93,9 +96,7 @@ export function joinGrain(joinType: string): {
   };
 }
 
-export function datasetControlMapping(
-  relation: JsonRecord,
-): {
+export function datasetControlMapping(relation: JsonRecord): {
   subtype: OpenLineageIndirectSubtype;
   grain: DatasetControlGrain;
   grainReason: NonNullable<DatasetControlAnnotation["grainReason"]>;
@@ -161,8 +162,9 @@ function buildReadRelationByField(
   for (const relation of relations.values()) {
     if (String(relation.relation_type ?? "").toLowerCase() !== "read") continue;
     const relationId = nonEmpty(relation.relation_id);
-    const physicalDataset = nonEmpty(relation.physical_dataset)
-      ?? nonEmpty(relationBody(relation).table);
+    const physicalDataset =
+      nonEmpty(relation.physical_dataset) ??
+      nonEmpty(relationBody(relation).table);
     if (!relationId || !physicalDataset) continue;
     for (const pair of collectPhysicalPairs(relation.relation)) {
       output.set(
@@ -179,7 +181,12 @@ export function buildControlsByStatement(
 ): Map<string, JsonRecord[]> {
   const controlsByStatement = new Map<string, JsonRecord[]>();
   for (const relation of relations.values()) {
-    if (!DATASET_CONTROL_RELATION_TYPES.has(String(relation.relation_type).toLowerCase())) continue;
+    if (
+      !DATASET_CONTROL_RELATION_TYPES.has(
+        String(relation.relation_type).toLowerCase(),
+      )
+    )
+      continue;
     const statementId = String(relation.statement_id ?? "");
     if (!statementId) continue;
     const values = controlsByStatement.get(statementId) ?? [];
@@ -191,13 +198,16 @@ export function buildControlsByStatement(
 
 const bundleControlIndexesCache = new WeakMap<object, DatasetControlIndexes>();
 
-export function bundleControlIndexesFor(load: CurrentBundleLoad): DatasetControlIndexes {
+export function bundleControlIndexesFor(
+  load: CurrentBundleLoad,
+): DatasetControlIndexes {
   const cached = bundleControlIndexesCache.get(load);
   if (cached) return cached;
   const relations = new Map<string, JsonRecord>();
   for (const relation of load.records["relation-nodes.jsonl"] ?? []) {
     const relationId = String(relation.relation_id ?? "");
-    if (relationId && !relations.has(relationId)) relations.set(relationId, relation);
+    if (relationId && !relations.has(relationId))
+      relations.set(relationId, relation);
   }
   const relationNodes = [...relations.values()];
   const indexes: DatasetControlIndexes = {
@@ -246,21 +256,30 @@ export function datasetControlsForStatement(
       else unresolved = true;
     }
     const evidenceRefs = [
-      load.evidence["relation-nodes.jsonl"] ?? "machine-facts:relation-nodes.jsonl",
+      load.evidence["relation-nodes.jsonl"] ??
+        "machine-facts:relation-nodes.jsonl",
     ];
     const sourceText = nonEmpty(relation.source_text);
     const joinRelation = relationId
       ? indexes.relationTree.relations.get(relationId)
       : undefined;
-    const joinType = mapping.subtype === "JOIN"
-      ? normalizeJoinType(joinRelation?.joinType ?? String(relationBody(relation).join_type ?? ""))
-      : "N/A";
-    const leftRelationId = mapping.subtype === "JOIN"
-      ? (joinRelation?.leftRelationId ?? nonEmpty(relationBody(relation).left))
-      : null;
-    const rightRelationId = mapping.subtype === "JOIN"
-      ? (joinRelation?.rightRelationId ?? nonEmpty(relationBody(relation).right))
-      : null;
+    const joinType =
+      mapping.subtype === "JOIN"
+        ? normalizeJoinType(
+            joinRelation?.joinType ??
+              String(relationBody(relation).join_type ?? ""),
+          )
+        : "N/A";
+    const leftRelationId =
+      mapping.subtype === "JOIN"
+        ? (joinRelation?.leftRelationId ??
+          nonEmpty(relationBody(relation).left))
+        : null;
+    const rightRelationId =
+      mapping.subtype === "JOIN"
+        ? (joinRelation?.rightRelationId ??
+          nonEmpty(relationBody(relation).right))
+        : null;
     const pushControl = (
       field: PhysicalFieldIdentity | null,
       evidenceStatus: DatasetControlAnnotation["evidenceStatus"],
@@ -301,16 +320,17 @@ export function datasetControlsForStatement(
       continue;
     }
     for (const field of fields.values()) {
-      const controlSide = mapping.subtype === "JOIN" && joinRelation
-        ? controlSideForJoin({
-          index: indexes.relationTree,
-          joinRelation,
-          controlReadRelationId:
-            indexes.readRelationByField.get(
-              `${normalizeName(field.qualifiedName)}\u0000${normalizeName(field.column)}`,
-            ) ?? null,
-        })
-        : "N/A";
+      const controlSide =
+        mapping.subtype === "JOIN" && joinRelation
+          ? controlSideForJoin({
+              index: indexes.relationTree,
+              joinRelation,
+              controlReadRelationId:
+                indexes.readRelationByField.get(
+                  `${normalizeName(field.qualifiedName)}\u0000${normalizeName(field.column)}`,
+                ) ?? null,
+            })
+          : "N/A";
       pushControl(field, status, null, controlSide);
     }
     if (unresolved)

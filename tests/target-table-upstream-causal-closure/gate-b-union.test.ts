@@ -1,13 +1,17 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  canonicalJson,
-  sha256,
-} from "../../scripts/machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../src/contracts/sha256.js";
 import {
   canonicalizeTargetTableArtifact,
   type TargetTableCausalClosureArtifact,
@@ -25,7 +29,8 @@ import type {
 const tempRoots: string[] = [];
 
 afterEach(() => {
-  for (const root of tempRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+  for (const root of tempRoots.splice(0))
+    rmSync(root, { recursive: true, force: true });
 });
 
 const TABLE: CandidatePhysicalTable = {
@@ -44,8 +49,17 @@ function makeIndex() {
     generatedAt: "2026-09-03T00:00:00.000Z",
     input: {
       batchManifestRef: { contentHash: "batch-hash" },
-      producerIndex: { contentHash: "producer-hash", inputFingerprint: "input-hash" },
-      taskProjections: [{ taskId: "producer", contentHash: "projection-hash", schemaVersion: "1.2.0" }],
+      producerIndex: {
+        contentHash: "producer-hash",
+        inputFingerprint: "input-hash",
+      },
+      taskProjections: [
+        {
+          taskId: "producer",
+          contentHash: "projection-hash",
+          schemaVersion: "1.2.0",
+        },
+      ],
     },
     entries: [
       {
@@ -105,8 +119,16 @@ function makeBranch(overrides: Partial<CandidateBranch> = {}): CandidateBranch {
       rootRelationId: "task:producer:statement:0:relation:root.project",
     },
     evidenceRefs: [
-      { evidenceRefId: "index-evidence", source: "UNION_CONTINUATION_INDEX", locator: "index" },
-      { evidenceRefId: "write-evidence", source: "MACHINE_FACTS_DATASET_IO", locator: "facts" },
+      {
+        evidenceRefId: "index-evidence",
+        source: "UNION_CONTINUATION_INDEX",
+        locator: "index",
+      },
+      {
+        evidenceRefId: "write-evidence",
+        source: "MACHINE_FACTS_DATASET_IO",
+        locator: "facts",
+      },
     ],
     gapRefs: [],
     boundaryReason: null,
@@ -121,7 +143,9 @@ function makeBranch(overrides: Partial<CandidateBranch> = {}): CandidateBranch {
   };
 }
 
-function makeClosure(branches: readonly CandidateBranch[]): TargetTableCausalClosureArtifact {
+function makeClosure(
+  branches: readonly CandidateBranch[],
+): TargetTableCausalClosureArtifact {
   return canonicalizeTargetTableArtifact({
     schemaVersion: "1.2.0",
     artifactType: "TARGET_TABLE_UPSTREAM_CAUSAL_CLOSURE",
@@ -170,7 +194,11 @@ function makeClosure(branches: readonly CandidateBranch[]): TargetTableCausalClo
       upstreamTaskCount: 0,
       fieldValueEvidenceScanCount: 1,
       evidenceClosureRate: "NOT_APPLICABLE",
-      decisionCoverage: { numerator: branches.length, denominator: branches.length, rate: 1 },
+      decisionCoverage: {
+        numerator: branches.length,
+        denominator: branches.length,
+        rate: 1,
+      },
       bridgeStats: { resolved: 1, ambiguous: 0, missing: 0 },
       continuationStats: {
         l1: 1,
@@ -186,7 +214,15 @@ function makeClosure(branches: readonly CandidateBranch[]): TargetTableCausalClo
     stages: [],
     gaps: [],
     shrinkReport: {
-      valueCertain: [{ taskId: "legacy-only", table: "legacy.table", channel: "FIELD_VALUE", viaFields: [], witness: [] }],
+      valueCertain: [
+        {
+          taskId: "legacy-only",
+          table: "legacy.table",
+          channel: "FIELD_VALUE",
+          viaFields: [],
+          witness: [],
+        },
+      ],
       rowDetermining: [],
       multiplicityRisk: [],
       prunedCount: 0,
@@ -264,10 +300,18 @@ describe("Gate B-UNION L1 set", () => {
 
   it("rejects a legacy closure that has no union-v2 continuation stats", () => {
     const closure = makeClosure([makeBranch()]);
-    const legacy = { ...closure, metrics: { ...closure.metrics, continuationStats: undefined } };
+    const legacy = {
+      ...closure,
+      metrics: { ...closure.metrics, continuationStats: undefined },
+    };
     const { contentHash: _contentHash, ...legacyStable } = legacy;
-    const legacyWithHash = { ...legacy, contentHash: sha256(canonicalJson(legacyStable)) };
-    const inputs = writeInputs(legacyWithHash as TargetTableCausalClosureArtifact);
+    const legacyWithHash = {
+      ...legacy,
+      contentHash: sha256(canonicalJson(legacyStable)),
+    };
+    const inputs = writeInputs(
+      legacyWithHash as TargetTableCausalClosureArtifact,
+    );
     expect(() =>
       createGateBUnionL1Set({
         closureArtifactPath: inputs.closurePath,
@@ -284,7 +328,10 @@ const artifactRoot = resolve(
   "target-table-causal-closure",
   "c2",
 );
-const real176827Closure = resolve(artifactRoot, "176827-union-v2-full-index-recovered-v5.json");
+const real176827Closure = resolve(
+  artifactRoot,
+  "176827-union-v2-full-index-recovered-v5.json",
+);
 const real176827Index = resolve(
   artifactRoot,
   "176827-continuation-index-full-recovered-v2",
@@ -297,11 +344,15 @@ if (existsSync(real176827Closure) && existsSync(real176827Index)) {
       closureArtifactPath: real176827Closure,
       continuationIndexPath: real176827Index,
     });
-    const closure = JSON.parse(readFileSync(real176827Closure, "utf8")) as TargetTableCausalClosureArtifact;
+    const closure = JSON.parse(
+      readFileSync(real176827Closure, "utf8"),
+    ) as TargetTableCausalClosureArtifact;
     expect(result.targetWrite.taskId).toBe("176827");
     expect(result.members.length).toBe(closure.metrics.continuationStats?.l1);
     expect(result.members.length).toBe(11);
-    expect(result.sourceMetrics.indexedPhysicalProducerCount).toBeGreaterThan(0);
+    expect(result.sourceMetrics.indexedPhysicalProducerCount).toBeGreaterThan(
+      0,
+    );
     expect(result.members).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -316,13 +367,20 @@ if (existsSync(real176827Closure) && existsSync(real176827Index)) {
   console.warn(
     `GATE_B_UNION_INPUT_BLOCKER:176827:closure=${existsSync(real176827Closure)}:index=${existsSync(real176827Index)}`,
   );
-  it.skip("176827 real closure input is unavailable; see explicit blocker above", () => undefined);
+  it.skip("176827 real closure input is unavailable; see explicit blocker above", () =>
+    undefined);
 }
 
-const real209119Closure = process.env.GATE_B_UNION_209119_CLOSURE ??
+const real209119Closure =
+  process.env.GATE_B_UNION_209119_CLOSURE ??
   resolve(artifactRoot, "209119-union-v2.json");
-const real209119Index = process.env.GATE_B_UNION_209119_INDEX ??
-  resolve(artifactRoot, "209119-continuation-index", "union-continuation-index.json");
+const real209119Index =
+  process.env.GATE_B_UNION_209119_INDEX ??
+  resolve(
+    artifactRoot,
+    "209119-continuation-index",
+    "union-continuation-index.json",
+  );
 
 if (existsSync(real209119Closure) && existsSync(real209119Index)) {
   it("reads a 209119 union-v2 closure when the caller supplies its verified inputs", () => {
@@ -338,6 +396,8 @@ if (existsSync(real209119Closure) && existsSync(real209119Index)) {
   console.warn(blocker);
   it("does not claim a 209119 Gate B-UNION pass without closure and INDEX", () => {
     expect(blocker).toContain("GATE_B_UNION_INPUT_BLOCKER:209119");
-    expect(existsSync(real209119Closure) && existsSync(real209119Index)).toBe(false);
+    expect(existsSync(real209119Closure) && existsSync(real209119Index)).toBe(
+      false,
+    );
   });
 }

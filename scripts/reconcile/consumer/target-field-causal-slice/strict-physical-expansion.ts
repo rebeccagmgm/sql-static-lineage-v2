@@ -1,7 +1,5 @@
-import {
-  canonicalJson,
-  sha256,
-} from "../../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 import type {
   PhysicalFieldExpansion,
   PhysicalFieldProducerExpansion,
@@ -63,7 +61,7 @@ export function guardOccurrenceExactPhysicalExpansion(input: {
           producer.producerBindings.flatMap((binding) => {
             const id = text(binding.write_observation_id);
             return id ? [id] : [];
-          })
+          }),
         ),
       );
       return writeObservationIds.length > 1
@@ -75,7 +73,7 @@ export function guardOccurrenceExactPhysicalExpansion(input: {
 
   const producerTaskIds = sortedUnique(
     conflicts.flatMap(({ producers }) =>
-      producers.map((producer) => producer.producerTaskId)
+      producers.map((producer) => producer.producerTaskId),
     ),
   );
   const writeObservationIds = sortedUnique(
@@ -85,11 +83,12 @@ export function guardOccurrenceExactPhysicalExpansion(input: {
     conflicts.flatMap(({ producers }) =>
       producers.flatMap((producer) => [
         ...producer.evidenceRefs,
-        ...producer.producerBindings.flatMap((binding) => [
-          text(binding.binding_id),
-          text(binding.write_observation_id),
-        ].filter((value): value is string => value !== null)),
-      ])
+        ...producer.producerBindings.flatMap((binding) =>
+          [text(binding.binding_id), text(binding.write_observation_id)].filter(
+            (value): value is string => value !== null,
+          ),
+        ),
+      ]),
     ),
   );
   const identity = {

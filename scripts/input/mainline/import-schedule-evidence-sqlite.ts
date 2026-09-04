@@ -1,13 +1,8 @@
-import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 
+import { sha256Hex as sha256 } from "../../../src/contracts/sha256.js";
 import {
   DEFAULT_SCHEDULE_EVIDENCE_CACHE_ROOT,
   resolveScheduleEvidenceCacheRoot,
@@ -44,15 +39,14 @@ interface EvidenceRow {
   readonly sourcePath: string;
 }
 
-function sha256(value: string): string {
-  return createHash("sha256").update(value, "utf8").digest("hex");
-}
-
 function nonEmptyString(value: unknown): string {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : "";
 }
 
-function parseDirection(fileName: string, parsed: Record<string, unknown> | null): string {
+function parseDirection(
+  fileName: string,
+  parsed: Record<string, unknown> | null,
+): string {
   const fromPayload = nonEmptyString(parsed?.direction);
   if (fromPayload === "up" || fromPayload === "down") return fromPayload;
   if (fileName.includes("-up-")) return "up";
@@ -60,16 +54,27 @@ function parseDirection(fileName: string, parsed: Record<string, unknown> | null
   return "";
 }
 
-function parseDepth(fileName: string, parsed: Record<string, unknown> | null): number {
+function parseDepth(
+  fileName: string,
+  parsed: Record<string, unknown> | null,
+): number {
   const fromPayload = parsed?.depth;
-  if (typeof fromPayload === "number" && Number.isInteger(fromPayload) && fromPayload >= 0) {
+  if (
+    typeof fromPayload === "number" &&
+    Number.isInteger(fromPayload) &&
+    fromPayload >= 0
+  ) {
     return fromPayload;
   }
   const match = /-depth-(\d+)\./u.exec(fileName);
   return match?.[1] === undefined ? 0 : Number(match[1]);
 }
 
-function readEvidenceRow(taskId: string, fileName: string, taskPath: string): EvidenceRow | null {
+function readEvidenceRow(
+  taskId: string,
+  fileName: string,
+  taskPath: string,
+): EvidenceRow | null {
   const extension = extname(fileName).toLowerCase();
   if (!IMPORTABLE_EXTENSIONS.has(extension)) return null;
   const sourcePath = join(taskPath, fileName);
@@ -97,7 +102,8 @@ function readEvidenceRow(taskId: string, fileName: string, taskPath: string): Ev
   } catch {
     return null;
   }
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+    return null;
   const record = parsed as Record<string, unknown>;
   const documentHash = nonEmptyString(record.content_sha256);
   return {
@@ -153,10 +159,13 @@ function initializeDatabase(databasePath: string): DatabaseSync {
 export function importScheduleEvidenceToSqlite(
   options: ImportScheduleEvidenceOptions = {},
 ): ImportScheduleEvidenceResult {
-  const cacheRoot = resolve(options.cacheRoot ?? DEFAULT_SCHEDULE_EVIDENCE_CACHE_ROOT);
+  const cacheRoot = resolve(
+    options.cacheRoot ?? DEFAULT_SCHEDULE_EVIDENCE_CACHE_ROOT,
+  );
   const scheduleEvidenceRoot = resolveScheduleEvidenceCacheRoot(cacheRoot);
   const tasksRoot = join(scheduleEvidenceRoot, "tasks");
-  if (!existsSync(tasksRoot)) throw new Error(`CACHE_TASKS_ROOT_MISSING:${tasksRoot}`);
+  if (!existsSync(tasksRoot))
+    throw new Error(`CACHE_TASKS_ROOT_MISSING:${tasksRoot}`);
   const databasePath = resolve(
     options.databasePath ??
       join(scheduleEvidenceRoot, "tasks-sqlite", "schedule-evidence.sqlite"),
@@ -195,13 +204,17 @@ export function importScheduleEvidenceToSqlite(
   database.exec("BEGIN");
   try {
     for (const taskEntry of readdirSync(tasksRoot, { withFileTypes: true })) {
-      if (!taskEntry.isDirectory() || !TASK_ID_PATTERN.test(taskEntry.name)) continue;
+      if (!taskEntry.isDirectory() || !TASK_ID_PATTERN.test(taskEntry.name))
+        continue;
       taskDirectories++;
       const taskId = taskEntry.name;
       const taskPath = join(tasksRoot, taskId);
       insertTask.run(taskId);
       for (const fileEntry of readdirSync(taskPath, { withFileTypes: true })) {
-        if (!fileEntry.isFile() || !IMPORTABLE_EXTENSIONS.has(extname(fileEntry.name).toLowerCase())) {
+        if (
+          !fileEntry.isFile() ||
+          !IMPORTABLE_EXTENSIONS.has(extname(fileEntry.name).toLowerCase())
+        ) {
           continue;
         }
         filesSeen++;

@@ -1,9 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { physicalFieldKey } from "../../../../src/contracts/identity.js";
 import {
-	indexTaskInputPacks,
-	loadPhysicalTableCatalog,
+  indexTaskInputPacks,
+  loadPhysicalTableCatalog,
   physicalTableKey,
   type PhysicalTableCatalog,
   type PhysicalTableCatalogEntry,
@@ -18,22 +19,24 @@ import {
   type TaskDocument,
 } from "../../../input/shared/input-pack.ts";
 import {
-	createCurrentTaskBundleReader,
-	type CurrentBundleLoad,
-	type JsonRecord,
+  createCurrentTaskBundleReader,
+  type CurrentBundleLoad,
+  type JsonRecord,
 } from "../../../query/current-task-bundle.ts";
 import {
   inferTaskDefaultSchema,
   type TaskDefaultSchema,
 } from "../../shared/task-default-schema.ts";
-import { buildControlsByStatement, datasetControlsForStatement } from "../../shared/dataset-controls.ts";
+import {
+  buildControlsByStatement,
+  datasetControlsForStatement,
+} from "../../shared/dataset-controls.ts";
 export { datasetControlsForStatement } from "../../shared/dataset-controls.ts";
 import { isCheckdbflagTask } from "../../shared/lineage-scope.ts";
 import {
   FIELD_LINEAGE_ARTIFACT_TYPE,
   FIELD_LINEAGE_SCHEMA_VERSION,
   canonicalizeFieldLineageArtifact,
-  physicalFieldKey,
   type FactsPolicy,
   type FieldLineageArtifact,
   type FieldLineageEdge,
@@ -47,8 +50,8 @@ import {
   type PhysicalFieldIdentity,
 } from "./field-lineage-contract.ts";
 import {
-	physicalFieldForTable,
-	resolvePhysicalInputField,
+  physicalFieldForTable,
+  resolvePhysicalInputField,
 } from "./physical-field-resolver.ts";
 import {
   createPhysicalFieldExpander,
@@ -62,7 +65,7 @@ type TaskPack = {
 };
 
 type TaskPackLookup = {
-	readonly get: (taskId: string) => TaskPack | undefined;
+  readonly get: (taskId: string) => TaskPack | undefined;
 };
 
 type TableLineageArtifact = JsonRecord & {
@@ -71,27 +74,30 @@ type TableLineageArtifact = JsonRecord & {
   readonly taskNodes?: readonly JsonRecord[];
   readonly producerBridges?: readonly JsonRecord[];
   readonly readEdges?: readonly JsonRecord[];
-	readonly scheduleEdges?: readonly JsonRecord[];
+  readonly scheduleEdges?: readonly JsonRecord[];
 };
 
 type LineageDecision = {
-	readonly primary: readonly string[];
-	readonly additional: readonly string[];
-	readonly unknown: readonly string[];
+  readonly primary: readonly string[];
+  readonly additional: readonly string[];
+  readonly unknown: readonly string[];
 };
 
 type BundleIndexes = {
-	readonly expressions: ReadonlyMap<string, JsonRecord>;
-	readonly relations: ReadonlyMap<string, JsonRecord>;
-	readonly incomingRelations: ReadonlyMap<string, readonly string[]>;
-	readonly controlsByStatement: ReadonlyMap<string, readonly JsonRecord[]>;
-	readonly valueInputFieldsByExpressionId: ReadonlyMap<string, readonly JsonRecord[]>;
+  readonly expressions: ReadonlyMap<string, JsonRecord>;
+  readonly relations: ReadonlyMap<string, JsonRecord>;
+  readonly incomingRelations: ReadonlyMap<string, readonly string[]>;
+  readonly controlsByStatement: ReadonlyMap<string, readonly JsonRecord[]>;
+  readonly valueInputFieldsByExpressionId: ReadonlyMap<
+    string,
+    readonly JsonRecord[]
+  >;
 };
 
 export interface ReconcileFieldLineageOptions {
-	readonly dataRoot: string;
-	readonly factsRoot: string;
-	readonly tableCatalog?: PhysicalTableCatalog;
+  readonly dataRoot: string;
+  readonly factsRoot: string;
+  readonly tableCatalog?: PhysicalTableCatalog;
   readonly tableLineage: TableLineageArtifact;
   readonly rootTaskId: string;
   readonly rootTable: string;
@@ -119,25 +125,22 @@ type TraversalState = {
     readonly sourceNodeId: string;
     readonly consumerTaskId: string;
     readonly producerTaskId: string | null;
-    readonly evidenceStatus:
-      | "CONFIRMED"
-      | "PROVISIONAL_LEGACY"
-      | "UNRESOLVED";
+    readonly evidenceStatus: "CONFIRMED" | "PROVISIONAL_LEGACY" | "UNRESOLVED";
     readonly evidenceRefs: readonly string[];
   } | null;
 };
 
 const FIELD_LINEAGE_BUNDLE_FILES = [
-	"statements.jsonl",
-	"dataset-io.jsonl",
-	"relation-nodes.jsonl",
-	"relation-edges.jsonl",
-	"field-expression-nodes.jsonl",
-	"column-lineage-edges.jsonl",
-	"output-field-bindings.jsonl",
-	"task-local-materializations.jsonl",
-	"unknowns.jsonl",
-	"schema-refs.jsonl",
+  "statements.jsonl",
+  "dataset-io.jsonl",
+  "relation-nodes.jsonl",
+  "relation-edges.jsonl",
+  "field-expression-nodes.jsonl",
+  "column-lineage-edges.jsonl",
+  "output-field-bindings.jsonl",
+  "task-local-materializations.jsonl",
+  "unknowns.jsonl",
+  "schema-refs.jsonl",
 ] as const;
 
 function compareText(left: string, right: string): number {
@@ -184,7 +187,8 @@ function rootPhysicalTarget(
   rootPack: TaskPack,
   rootTable: string,
 ): PhysicalTableCatalogEntry {
-  const candidates = catalog.byQualifiedName.get(normalizeName(rootTable)) ?? [];
+  const candidates =
+    catalog.byQualifiedName.get(normalizeName(rootTable)) ?? [];
   if (candidates.length === 1) return candidates[0]!;
   if (rootPack.target) {
     const sameSource = candidates.filter(
@@ -195,41 +199,44 @@ function rootPhysicalTarget(
     if (sameSource.length === 1) return sameSource[0]!;
   }
   if (candidates.length === 0)
-    throw new Error(`ROOT_TARGET_IDENTITY_UNRESOLVED:${normalizeName(rootTable)}`);
+    throw new Error(
+      `ROOT_TARGET_IDENTITY_UNRESOLVED:${normalizeName(rootTable)}`,
+    );
   throw new Error(`ROOT_TARGET_IDENTITY_AMBIGUOUS:${normalizeName(rootTable)}`);
 }
 
 function loadTaskPacks(
-	dataRoot: string,
-	catalog: PhysicalTableCatalog,
+  dataRoot: string,
+  catalog: PhysicalTableCatalog,
   taskPathIndex: ReadonlyMap<string, readonly string[]>,
 ): TaskPackLookup {
-	const cache = new Map<string, TaskPack | null>();
-	return {
-		get: (taskId: string): TaskPack | undefined => {
-			if (cache.has(taskId)) return cache.get(taskId) ?? undefined;
-			const paths = taskPathIndex.get(taskId) ?? [];
-			if (paths.length !== 1) {
-				cache.set(taskId, null);
-				return undefined;
-			}
-			try {
-				const path = paths[0]!;
-				const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
-				validateTaskDocument(raw);
-				const document = raw as TaskDocument & JsonRecord;
-				if (document.taskId !== taskId) throw new Error("TASK_IDENTITY_MISMATCH");
-				const pack = { document, path, target: taskTarget(document, catalog) };
-				cache.set(taskId, pack);
-				return pack;
-			} catch {
-				// Invalid packs remain unavailable to the field consumer. Their status is
-				// surfaced when a lineage branch tries to enter the Task.
-				cache.set(taskId, null);
-				return undefined;
-			}
-		},
-	};
+  const cache = new Map<string, TaskPack | null>();
+  return {
+    get: (taskId: string): TaskPack | undefined => {
+      if (cache.has(taskId)) return cache.get(taskId) ?? undefined;
+      const paths = taskPathIndex.get(taskId) ?? [];
+      if (paths.length !== 1) {
+        cache.set(taskId, null);
+        return undefined;
+      }
+      try {
+        const path = paths[0]!;
+        const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
+        validateTaskDocument(raw);
+        const document = raw as TaskDocument & JsonRecord;
+        if (document.taskId !== taskId)
+          throw new Error("TASK_IDENTITY_MISMATCH");
+        const pack = { document, path, target: taskTarget(document, catalog) };
+        cache.set(taskId, pack);
+        return pack;
+      } catch {
+        // Invalid packs remain unavailable to the field consumer. Their status is
+        // surfaced when a lineage branch tries to enter the Task.
+        cache.set(taskId, null);
+        return undefined;
+      }
+    },
+  };
 }
 
 function excludedTaskDetail(
@@ -325,7 +332,9 @@ function targetBindings(
             binding.task_id === load.taskId)) &&
         normalizeName(String(binding.target_field ?? "")) === field.column &&
         (writeObservationIds === undefined ||
-          writeObservationIds.has(String(binding.write_observation_id ?? ""))) &&
+          writeObservationIds.has(
+            String(binding.write_observation_id ?? ""),
+          )) &&
         binding.binding_status === "RESOLVED",
     )
     .sort((left, right) =>
@@ -401,134 +410,144 @@ function taskLocalMaterializationBindingIds(
 const bundleIndexesCache = new WeakMap<object, BundleIndexes>();
 
 function bundleIndexesFor(load: CurrentBundleLoad): BundleIndexes {
-	const cached = bundleIndexesCache.get(load);
-	if (cached) return cached;
-	const expressions = new Map<string, JsonRecord>();
-	for (const expression of load.records["field-expression-nodes.jsonl"] ?? []) {
-		const expressionId = String(expression.expression_id ?? "");
-		if (expressionId && !expressions.has(expressionId)) expressions.set(expressionId, expression);
-	}
-	const relations = new Map<string, JsonRecord>();
-	for (const relation of load.records["relation-nodes.jsonl"] ?? []) {
-		const relationId = String(relation.relation_id ?? "");
-		if (relationId && !relations.has(relationId)) relations.set(relationId, relation);
-	}
-	const incomingRelations = new Map<string, string[]>();
-	for (const edge of load.records["relation-edges.jsonl"] ?? []) {
-		const to = String(edge.to_relation_id ?? "");
-		const from = String(edge.from_relation_id ?? "");
-		if (!to || !from) continue;
-		const values = incomingRelations.get(to) ?? [];
-		values.push(from);
-		incomingRelations.set(to, values);
-	}
-	const controlsByStatement = buildControlsByStatement(relations);
-	const valueInputFieldsByExpressionId = new Map<string, readonly JsonRecord[]>();
-	for (const [expressionId, expression] of expressions) {
-		const relation = relations.get(String(expression.relation_id ?? ""));
-		const valueInputs = valueContributionInputFields(
-			relation?.relation,
-			String(expression.output_name ?? expression.output ?? ""),
-		);
-		if (valueInputs !== null)
-			valueInputFieldsByExpressionId.set(expressionId, valueInputs);
-	}
-	const indexes: BundleIndexes = {
-		expressions,
-		relations,
-		incomingRelations,
-		controlsByStatement,
-		valueInputFieldsByExpressionId,
-	};
-	bundleIndexesCache.set(load, indexes);
-	return indexes;
+  const cached = bundleIndexesCache.get(load);
+  if (cached) return cached;
+  const expressions = new Map<string, JsonRecord>();
+  for (const expression of load.records["field-expression-nodes.jsonl"] ?? []) {
+    const expressionId = String(expression.expression_id ?? "");
+    if (expressionId && !expressions.has(expressionId))
+      expressions.set(expressionId, expression);
+  }
+  const relations = new Map<string, JsonRecord>();
+  for (const relation of load.records["relation-nodes.jsonl"] ?? []) {
+    const relationId = String(relation.relation_id ?? "");
+    if (relationId && !relations.has(relationId))
+      relations.set(relationId, relation);
+  }
+  const incomingRelations = new Map<string, string[]>();
+  for (const edge of load.records["relation-edges.jsonl"] ?? []) {
+    const to = String(edge.to_relation_id ?? "");
+    const from = String(edge.from_relation_id ?? "");
+    if (!to || !from) continue;
+    const values = incomingRelations.get(to) ?? [];
+    values.push(from);
+    incomingRelations.set(to, values);
+  }
+  const controlsByStatement = buildControlsByStatement(relations);
+  const valueInputFieldsByExpressionId = new Map<
+    string,
+    readonly JsonRecord[]
+  >();
+  for (const [expressionId, expression] of expressions) {
+    const relation = relations.get(String(expression.relation_id ?? ""));
+    const valueInputs = valueContributionInputFields(
+      relation?.relation,
+      String(expression.output_name ?? expression.output ?? ""),
+    );
+    if (valueInputs !== null)
+      valueInputFieldsByExpressionId.set(expressionId, valueInputs);
+  }
+  const indexes: BundleIndexes = {
+    expressions,
+    relations,
+    incomingRelations,
+    controlsByStatement,
+    valueInputFieldsByExpressionId,
+  };
+  bundleIndexesCache.set(load, indexes);
+  return indexes;
 }
 
 function expressionFor(
-	load: CurrentBundleLoad,
-	binding: JsonRecord,
+  load: CurrentBundleLoad,
+  binding: JsonRecord,
 ): JsonRecord | null {
-	return bundleIndexesFor(load).expressions.get(String(binding.expression_id ?? "")) ?? null;
+  return (
+    bundleIndexesFor(load).expressions.get(
+      String(binding.expression_id ?? ""),
+    ) ?? null
+  );
 }
 
 const INPUT_DEPENDENCY_STATUSES = new Set<InputDependencyStatus>([
-	"PHYSICAL",
-	"DERIVED_OUTPUT",
-	"SQL_CANDIDATE",
-	"PARTIAL",
-	"UNRESOLVED",
-	"NO_PHYSICAL_INPUT",
+  "PHYSICAL",
+  "DERIVED_OUTPUT",
+  "SQL_CANDIDATE",
+  "PARTIAL",
+  "UNRESOLVED",
+  "NO_PHYSICAL_INPUT",
 ]);
 
 export function valueContributionInputFields(
-	value: unknown,
-	outputName: string,
+  value: unknown,
+  outputName: string,
 ): JsonRecord[] | null {
-	const normalizedOutput = normalizeName(outputName);
-	if (!normalizedOutput) return null;
-	const matches: JsonRecord[] = [];
-	const visit = (candidate: unknown): void => {
-		if (Array.isArray(candidate)) {
-			for (const item of candidate) visit(item);
-			return;
-		}
-		const record = asRecord(candidate);
-		if (!record) return;
-		const candidateOutput = normalizeName(
-			String(record.output ?? record.output_name ?? ""),
-		);
-		if (
-			candidateOutput === normalizedOutput &&
-			Array.isArray(record.expression_roles) &&
-			record.expression_roles.length > 0
-		)
-			matches.push(record);
-		for (const key of ["expressions", "measures"]) visit(record[key]);
-	};
-	visit(value);
-	if (matches.length === 0) return null;
+  const normalizedOutput = normalizeName(outputName);
+  if (!normalizedOutput) return null;
+  const matches: JsonRecord[] = [];
+  const visit = (candidate: unknown): void => {
+    if (Array.isArray(candidate)) {
+      for (const item of candidate) visit(item);
+      return;
+    }
+    const record = asRecord(candidate);
+    if (!record) return;
+    const candidateOutput = normalizeName(
+      String(record.output ?? record.output_name ?? ""),
+    );
+    if (
+      candidateOutput === normalizedOutput &&
+      Array.isArray(record.expression_roles) &&
+      record.expression_roles.length > 0
+    )
+      matches.push(record);
+    for (const key of ["expressions", "measures"]) visit(record[key]);
+  };
+  visit(value);
+  if (matches.length === 0) return null;
 
-	const fields = new Map<string, JsonRecord>();
-	for (const match of matches) {
-		const roles = Array.isArray(match.expression_roles)
-			? match.expression_roles
-			: [];
-		for (const rawRole of roles) {
-			const role = asRecord(rawRole);
-			const effects = Array.isArray(role?.effects)
-				? role.effects.map((effect) => normalizeName(String(effect)))
-				: [];
-			if (!effects.includes("value_contribution")) continue;
-			const inputColumns = Array.isArray(role?.input_columns)
-				? role.input_columns
-				: [];
-			for (const rawInput of inputColumns) {
-				const input = asRecord(rawInput);
-				const physical = Array.isArray(input?.physical)
-					? input.physical
-					: [];
-				for (const rawField of physical) {
-					const field = asRecord(rawField);
-					const table = normalizeName(String(field?.table ?? ""));
-					const column = normalizeName(String(field?.column ?? ""));
-					if (!table || !column) continue;
-					fields.set(`${table}.${column}`, { table, column });
-				}
-			}
-		}
-	}
-	return [...fields.values()].sort((left, right) =>
-		compareText(`${left.table}.${left.column}`, `${right.table}.${right.column}`),
-	);
+  const fields = new Map<string, JsonRecord>();
+  for (const match of matches) {
+    const roles = Array.isArray(match.expression_roles)
+      ? match.expression_roles
+      : [];
+    for (const rawRole of roles) {
+      const role = asRecord(rawRole);
+      const effects = Array.isArray(role?.effects)
+        ? role.effects.map((effect) => normalizeName(String(effect)))
+        : [];
+      if (!effects.includes("value_contribution")) continue;
+      const inputColumns = Array.isArray(role?.input_columns)
+        ? role.input_columns
+        : [];
+      for (const rawInput of inputColumns) {
+        const input = asRecord(rawInput);
+        const physical = Array.isArray(input?.physical) ? input.physical : [];
+        for (const rawField of physical) {
+          const field = asRecord(rawField);
+          const table = normalizeName(String(field?.table ?? ""));
+          const column = normalizeName(String(field?.column ?? ""));
+          if (!table || !column) continue;
+          fields.set(`${table}.${column}`, { table, column });
+        }
+      }
+    }
+  }
+  return [...fields.values()].sort((left, right) =>
+    compareText(
+      `${left.table}.${left.column}`,
+      `${right.table}.${right.column}`,
+    ),
+  );
 }
 
 function expressionInputDependencyStatus(
-	expression: JsonRecord,
+  expression: JsonRecord,
 ): InputDependencyStatus | undefined {
-	const status = String(expression.input_dependency_status ?? "");
-	return INPUT_DEPENDENCY_STATUSES.has(status as InputDependencyStatus)
-		? (status as InputDependencyStatus)
-		: undefined;
+  const status = String(expression.input_dependency_status ?? "");
+  return INPUT_DEPENDENCY_STATUSES.has(status as InputDependencyStatus)
+    ? (status as InputDependencyStatus)
+    : undefined;
 }
 
 function sourceFields(
@@ -544,12 +563,12 @@ function sourceFields(
 } {
   const fields = new Map<string, PhysicalFieldIdentity>();
   const unresolved: { table: string; column: string; reason: string }[] = [];
-  const indexedValueInputs = bundleIndexesFor(load).valueInputFieldsByExpressionId.get(
-    String(expression.expression_id ?? ""),
-  );
-  const inputFields = indexedValueInputs ?? (Array.isArray(expression.input_fields)
-    ? expression.input_fields
-    : []);
+  const indexedValueInputs = bundleIndexesFor(
+    load,
+  ).valueInputFieldsByExpressionId.get(String(expression.expression_id ?? ""));
+  const inputFields =
+    indexedValueInputs ??
+    (Array.isArray(expression.input_fields) ? expression.input_fields : []);
   for (const raw of inputFields) {
     const input = asRecord(raw);
     const rawTableName = normalizeName(String(input?.table ?? ""));
@@ -593,8 +612,10 @@ function sourceFields(
   };
 }
 
-function lineageDecisions(tableLineage: TableLineageArtifact): ReadonlyMap<string, LineageDecision> {
-	const result = new Map<string, LineageDecision>();
+function lineageDecisions(
+  tableLineage: TableLineageArtifact,
+): ReadonlyMap<string, LineageDecision> {
+  const result = new Map<string, LineageDecision>();
   for (const raw of Array.isArray(tableLineage.taskNodes)
     ? tableLineage.taskNodes
     : []) {
@@ -613,7 +634,7 @@ function lineageDecisions(tableLineage: TableLineageArtifact): ReadonlyMap<strin
       unknown: values("unknown"),
     });
   }
-	return result;
+  return result;
 }
 
 function isZipperExistenceCase(text: string | null): boolean {
@@ -690,7 +711,10 @@ function branchSelectionInputFields(
     }
   }
   return [...fields.values()].sort((left, right) =>
-    compareText(`${left.table}.${left.column}`, `${right.table}.${right.column}`),
+    compareText(
+      `${left.table}.${left.column}`,
+      `${right.table}.${right.column}`,
+    ),
   );
 }
 
@@ -702,7 +726,14 @@ export function sourceFieldsForExpression(
   taskTarget: PhysicalTableCatalogEntry,
   defaultSchema: TaskDefaultSchema | null,
 ): ReturnType<typeof sourceFields> {
-  return sourceFields(expression, catalog, load, taskId, taskTarget, defaultSchema);
+  return sourceFields(
+    expression,
+    catalog,
+    load,
+    taskId,
+    taskTarget,
+    defaultSchema,
+  );
 }
 
 function fieldConditionalsFor(
@@ -838,9 +869,11 @@ export function reconcileFieldLineage(
     throw new Error("TABLE_LINEAGE_ROOT_MISMATCH");
 
   const dataRoot = resolve(options.dataRoot);
-	const catalog = options.tableCatalog ?? loadPhysicalTableCatalog(dataRoot, { lazyDdl: true });
-	const taskPathIndex = options.taskPathIndex ?? indexTaskInputPacks(dataRoot);
-	const taskPacks = loadTaskPacks(dataRoot, catalog, taskPathIndex);
+  const catalog =
+    options.tableCatalog ??
+    loadPhysicalTableCatalog(dataRoot, { lazyDdl: true });
+  const taskPathIndex = options.taskPathIndex ?? indexTaskInputPacks(dataRoot);
+  const taskPacks = loadTaskPacks(dataRoot, catalog, taskPathIndex);
   const rootPack = taskPacks.get(options.rootTaskId);
   if (!rootPack)
     throw new Error(`ROOT_TASK_INPUT_PACK_MISSING:${options.rootTaskId}`);
@@ -852,46 +885,44 @@ export function reconcileFieldLineage(
     options.rootFields.length > 0 ? "EXPLICIT" : "ALL_TARGET_COLUMNS";
   const rootFields = [
     ...new Set(
-      (options.rootFields.length > 0
-        ? options.rootFields
-        : rootTarget.columns
-      )
+      (options.rootFields.length > 0 ? options.rootFields : rootTarget.columns)
         .map(normalizeName)
         .filter(Boolean),
     ),
   ].sort(compareText);
-  if (rootFields.length === 0)
-    throw new Error("ROOT_TARGET_SCHEMA_EMPTY");
+  if (rootFields.length === 0) throw new Error("ROOT_TARGET_SCHEMA_EMPTY");
 
   const nodes = new Map<string, FieldLineageNode>();
   const edges = new Map<string, FieldLineageEdge>();
   const controls = new Map<string, DatasetControlAnnotation>();
   const fieldConditionals = new Map<string, FieldConditionalAnnotation>();
-	const candidates = new Map<string, FieldProducerCandidate>();
-	const gaps = new Map<string, FieldLineageGap>();
-	const rootNodeIds: string[] = [];
-	const frontier: TraversalState[] = [];
-	const visited = new Set<string>();
-	const collectedStatements = new Set<string>();
-	const limitReasons = new Set<
-		"MAX_DEPTH_REACHED" | "MAX_STATES_REACHED" | "MAX_PATHS_REACHED"
-	>();
-	let pathCount = 0;
-	let startedRoots = 0;
+  const candidates = new Map<string, FieldProducerCandidate>();
+  const gaps = new Map<string, FieldLineageGap>();
+  const rootNodeIds: string[] = [];
+  const frontier: TraversalState[] = [];
+  const visited = new Set<string>();
+  const collectedStatements = new Set<string>();
+  const limitReasons = new Set<
+    "MAX_DEPTH_REACHED" | "MAX_STATES_REACHED" | "MAX_PATHS_REACHED"
+  >();
+  let pathCount = 0;
+  let startedRoots = 0;
 
-	const factsReader = createCurrentTaskBundleReader(options.factsRoot, {
-		requestedFiles: FIELD_LINEAGE_BUNDLE_FILES,
-		validateOutputHashes: "requested",
-	});
-	const loadFacts = (taskId: string): CurrentBundleLoad => factsReader.load(taskId);
-  const physicalFieldExpander: PhysicalFieldExpander = createPhysicalFieldExpander({
-    dataRoot,
-    catalog,
-    tableLineage: options.tableLineage,
-    taskPacks,
-    loadFacts,
-    factsPolicy: options.factsPolicy,
+  const factsReader = createCurrentTaskBundleReader(options.factsRoot, {
+    requestedFiles: FIELD_LINEAGE_BUNDLE_FILES,
+    validateOutputHashes: "requested",
   });
+  const loadFacts = (taskId: string): CurrentBundleLoad =>
+    factsReader.load(taskId);
+  const physicalFieldExpander: PhysicalFieldExpander =
+    createPhysicalFieldExpander({
+      dataRoot,
+      catalog,
+      tableLineage: options.tableLineage,
+      taskPacks,
+      loadFacts,
+      factsPolicy: options.factsPolicy,
+    });
   const rootFacts = loadFacts(options.rootTaskId);
   const rootObservationIds = writeObservationIdsForTarget(
     rootFacts,
@@ -902,7 +933,13 @@ export function reconcileFieldLineage(
     normalizeName(rootPack.target.qualifiedName) ===
     normalizeName(rootTarget.qualifiedName);
   const selectedRootObservationIds = options.rootWriteObservationIds
-    ? [...new Set(options.rootWriteObservationIds.map((id) => id.trim()).filter(Boolean))].sort(compareText)
+    ? [
+        ...new Set(
+          options.rootWriteObservationIds
+            .map((id) => id.trim())
+            .filter(Boolean),
+        ),
+      ].sort(compareText)
     : rootTargetMatchesPlatformTarget
       ? rootObservationIds
       : [];
@@ -1291,7 +1328,9 @@ export function reconcileFieldLineage(
           ...taskLocalBindings.map((binding) => String(binding.binding_id)),
           ...taskLocalMaterializationBindings,
         ]),
-      ].filter(Boolean).sort(compareText);
+      ]
+        .filter(Boolean)
+        .sort(compareText);
       const source: PhysicalFieldIdentity =
         localBindingIds.length > 0
           ? {
@@ -1365,16 +1404,16 @@ export function reconcileFieldLineage(
             nodeId: localNodeId,
             depth: current.depth,
             active: current.active,
-          incoming: {
-            sourceNodeId: sourceId,
-            consumerTaskId: current.taskId,
-            producerTaskId: null,
-            evidenceStatus,
-            evidenceRefs: [
-              load.evidence["field-expression-nodes.jsonl"] ?? load.bundleDir,
-              load.evidence["output-field-bindings.jsonl"] ?? load.bundleDir,
-            ],
-          },
+            incoming: {
+              sourceNodeId: sourceId,
+              consumerTaskId: current.taskId,
+              producerTaskId: null,
+              evidenceStatus,
+              evidenceRefs: [
+                load.evidence["field-expression-nodes.jsonl"] ?? load.bundleDir,
+                load.evidence["output-field-bindings.jsonl"] ?? load.bundleDir,
+              ],
+            },
           });
         }
         continue;
@@ -1398,15 +1437,15 @@ export function reconcileFieldLineage(
           evidenceStatus: "CANDIDATE",
         });
       if (expansion.ambiguous) continue;
-      const nextActive = new Set([
-        ...current.active,
-        currentStateKey,
-      ]);
+      const nextActive = new Set([...current.active, currentStateKey]);
       for (const producer of expansion.producers) {
         if (!producer.producerField || !producer.shouldRecurse) continue;
-        const nextBindings = producer.producerBindings.length > 0
-          ? producer.producerBindings.map((binding) => String(binding.binding_id))
-          : [null];
+        const nextBindings =
+          producer.producerBindings.length > 0
+            ? producer.producerBindings.map((binding) =>
+                String(binding.binding_id),
+              )
+            : [null];
         for (const bindingId of nextBindings) {
           const nextStateKey = stateKey(
             producer.producerTaskId,
@@ -1427,9 +1466,14 @@ export function reconcileFieldLineage(
             });
             continue;
           }
-          const producerNodeId = bindingId === null
-            ? null
-            : nodeId(producer.producerTaskId, producer.producerField, bindingId);
+          const producerNodeId =
+            bindingId === null
+              ? null
+              : nodeId(
+                  producer.producerTaskId,
+                  producer.producerField,
+                  bindingId,
+                );
           if (producerNodeId && !nodes.has(producerNodeId))
             nodes.set(producerNodeId, {
               nodeId: producerNodeId,

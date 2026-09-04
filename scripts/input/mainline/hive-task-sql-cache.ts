@@ -9,20 +9,24 @@ import {
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 
-import {
-  canonicalJson,
-  sha256,
-} from "../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../src/contracts/sha256.js";
 import {
   DEFAULT_SCHEDULE_EVIDENCE_CACHE_ROOT,
   resolveScheduleEvidenceCacheRoot,
 } from "../../reconcile/consumer/one-hop/schedule-evidence-cache.ts";
 
 export const HIVE_TASK_SQL_CACHE_SCHEMA_VERSION = "1.0.0" as const;
-export const HIVE_TASK_SQL_CACHE_ARTIFACT_TYPE = "HIVE_TASK_SQL_EVIDENCE" as const;
+export const HIVE_TASK_SQL_CACHE_ARTIFACT_TYPE =
+  "HIVE_TASK_SQL_EVIDENCE" as const;
 export const HIVE_TASK_SQL_CACHE_FILE_NAME = "hive-task.sql" as const;
-export const HIVE_TASK_SQL_LEGACY_CACHE_FILE_NAME = "hive-task-sql.json" as const;
-export const HIVE_TASK_SQL_SOURCES = ["LOCAL_CODE", "SQL_MCP", "HORAE_LOG"] as const;
+export const HIVE_TASK_SQL_LEGACY_CACHE_FILE_NAME =
+  "hive-task-sql.json" as const;
+export const HIVE_TASK_SQL_SOURCES = [
+  "LOCAL_CODE",
+  "SQL_MCP",
+  "HORAE_LOG",
+] as const;
 export type HiveTaskSqlSource = (typeof HIVE_TASK_SQL_SOURCES)[number];
 
 /** Template vars that are OK to keep unresolved in offline packs. */
@@ -68,7 +72,11 @@ export interface HiveTaskSqlCacheDocument {
 
 export type HiveTaskSqlCacheRead =
   | { readonly status: "MISS"; readonly path: string }
-  | { readonly status: "INVALID"; readonly path: string; readonly reason: string }
+  | {
+      readonly status: "INVALID";
+      readonly path: string;
+      readonly reason: string;
+    }
   | {
       readonly status: "HIT";
       readonly path: string;
@@ -310,7 +318,9 @@ function mergeHiveTaskSqlSlots(
 ): { readonly createSql: string | null; readonly querySql: string | null } {
   const splitCreate = splitCombinedHiveTaskSql(createSql);
   const splitQuery =
-    querySql === null ? { createSql: null, querySql: null } : splitCombinedHiveTaskSql(querySql);
+    querySql === null
+      ? { createSql: null, querySql: null }
+      : splitCombinedHiveTaskSql(querySql);
   const create = splitCreate.createSql ?? splitQuery.createSql;
   const queryParts = [splitCreate.querySql, splitQuery.querySql].filter(
     (part): part is string => part !== null,
@@ -321,7 +331,10 @@ function mergeHiveTaskSqlSlots(
   };
 }
 
-function findMatchingParen(source: string, openIndex: number): number | undefined {
+function findMatchingParen(
+  source: string,
+  openIndex: number,
+): number | undefined {
   let depth = 0;
   let quote: string | undefined;
   let index = openIndex;
@@ -332,10 +345,7 @@ function findMatchingParen(source: string, openIndex: number): number | undefine
         index += 2;
         continue;
       }
-      if (
-        quote.length === 3 &&
-        source.startsWith(quote, index)
-      ) {
+      if (quote.length === 3 && source.startsWith(quote, index)) {
         quote = undefined;
         index += 3;
         continue;
@@ -375,7 +385,10 @@ function resolveLastStringAssignment(
   identifier: string,
   beforeIndex: number,
 ): string | null {
-  const pattern = new RegExp(`\\b${identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*=\\s*`, "g");
+  const pattern = new RegExp(
+    `\\b${identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*=\\s*`,
+    "g",
+  );
   let last: string | null = null;
   for (const match of source.matchAll(pattern)) {
     const assignIndex = match.index ?? 0;
@@ -596,7 +609,8 @@ function parseHiveTaskSqlFile(
   }
   while (index < lines.length && lines[index]!.trim() === "") index += 1;
   const body = lines.slice(index).join("\n").trim();
-  const observedAt = nonEmptyString(meta.observed_at) ?? nonEmptyString(meta.observedAt);
+  const observedAt =
+    nonEmptyString(meta.observed_at) ?? nonEmptyString(meta.observedAt);
   if (!observedAt) return invalid(path, "OBSERVED_AT_MISSING");
   if (meta.task_id !== undefined && meta.task_id !== taskId)
     return invalid(path, "TASK_ID_MISMATCH");
@@ -610,11 +624,13 @@ function parseHiveTaskSqlFile(
     if (createIndex >= 0) {
       const start = body.indexOf("\n", createIndex);
       const end = queryIndex >= 0 ? queryIndex : body.length;
-      createSql = nullableSql(body.slice(start < 0 ? body.length : start, end)) ?? null;
+      createSql =
+        nullableSql(body.slice(start < 0 ? body.length : start, end)) ?? null;
     }
     if (queryIndex >= 0) {
       const start = body.indexOf("\n", queryIndex);
-      querySql = nullableSql(body.slice(start < 0 ? body.length : start)) ?? null;
+      querySql =
+        nullableSql(body.slice(start < 0 ? body.length : start)) ?? null;
     }
   } else {
     querySql = nullableSql(body) ?? null;
@@ -722,7 +738,8 @@ export function readHiveTaskSqlCache(
       return invalid(legacyPath, "SCHEMA_VERSION_MISMATCH");
     if (record.artifact_type !== HIVE_TASK_SQL_CACHE_ARTIFACT_TYPE)
       return invalid(legacyPath, "ARTIFACT_TYPE_MISMATCH");
-    if (record.task_id !== taskId) return invalid(legacyPath, "TASK_ID_MISMATCH");
+    if (record.task_id !== taskId)
+      return invalid(legacyPath, "TASK_ID_MISMATCH");
     const observedAt = nonEmptyString(record.observed_at);
     if (!observedAt) return invalid(legacyPath, "OBSERVED_AT_MISSING");
     const evidence = validateEvidence(record);
@@ -767,10 +784,14 @@ export function writeHiveTaskSqlCache(
   const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
   mkdirSync(dirname(path), { recursive: true });
   try {
-    writeFileSync(temporaryPath, formatHiveTaskSqlFile(taskId, observedAt, validated), {
-      encoding: "utf8",
-      flag: "wx",
-    });
+    writeFileSync(
+      temporaryPath,
+      formatHiveTaskSqlFile(taskId, observedAt, validated),
+      {
+        encoding: "utf8",
+        flag: "wx",
+      },
+    );
     if (options.overwrite && existsSync(path)) {
       const backupPath = `${path}.${process.pid}.${randomUUID()}.bak`;
       renameSync(path, backupPath);

@@ -7,10 +7,9 @@ import type {
   SourceSpan,
   WindowInputBinding,
 } from "../../../plans/plan-contract.ts";
-import {
-  canonicalJson,
-  sha256,
-} from "../../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../../src/contracts/canonical-json.js";
+import { physicalFieldKey } from "../../../../src/contracts/identity.js";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 import {
   createProofRef,
   isCompleteSemanticOccurrenceScope,
@@ -39,10 +38,7 @@ import {
   type OperatorSupportQuery,
   type OperatorVariant,
 } from "./operator-support-matrix.ts";
-import {
-  physicalFieldKey,
-  type PhysicalFieldIdentity,
-} from "../field-lineage/field-lineage-contract.ts";
+import type { PhysicalFieldIdentity } from "../field-lineage/field-lineage-contract.ts";
 
 /** A resolved Plan Facts column can be upgraded to the shared physical identity. */
 export interface SemanticPhysicalFieldResolver {
@@ -269,7 +265,10 @@ function physicalSubjects(
 ): {
   readonly subjects: readonly SemanticSubject[];
   readonly proofRefs: readonly ProofRef[];
-  readonly unresolvedReferences: readonly { readonly table: string; readonly column: string }[];
+  readonly unresolvedReferences: readonly {
+    readonly table: string;
+    readonly column: string;
+  }[];
 } {
   const physical = column.physical;
   if (!Array.isArray(physical) || physical.length === 0)
@@ -548,36 +547,44 @@ export function normalizeSemanticDependencies(
 ): SemanticDependencyNormalization {
   const rootCriterion = input.rootCriterion;
   const localRootCriterion = input.localRootCriterion ?? rootCriterion;
-  const scopeValid = isCompleteSemanticOccurrenceScope(
-    input.semanticScope,
-    localRootCriterion,
-  ) && input.plan.meta.statement_index === localRootCriterion.statementIndex;
+  const scopeValid =
+    isCompleteSemanticOccurrenceScope(
+      input.semanticScope,
+      localRootCriterion,
+    ) && input.plan.meta.statement_index === localRootCriterion.statementIndex;
   if (!scopeValid) {
-    const evidenceRefs = unique([
-      ...rootCriterion.evidenceRefs,
-      ...localRootCriterion.evidenceRefs,
-      rootCriterion.rootWriteObservationId,
-      rootCriterion.statementId,
-      rootCriterion.rootRelationId,
-      rootCriterion.outputExpressionId,
-      rootCriterion.outputBindingId,
-      localRootCriterion.rootWriteObservationId,
-      localRootCriterion.statementId,
-      localRootCriterion.rootRelationId,
-      localRootCriterion.outputExpressionId,
-      localRootCriterion.outputBindingId,
-    ], (value) => value);
-    const gapId = `semantic-gap:${sha256(canonicalJson({
-      rootCriterionId: rootCriterion.rootCriterionId,
-      reasonCode: "SEMANTIC_SCOPE_INCOMPLETE",
-      evidenceRefs,
-    }))}`;
-    const proofRefs = evidenceRefs.map((ref) => createProofRef(
-      ref === rootCriterion.rootWriteObservationId
-        ? "WRITE_OBSERVATION"
-        : "CANONICAL_FACT",
-      ref,
-    ));
+    const evidenceRefs = unique(
+      [
+        ...rootCriterion.evidenceRefs,
+        ...localRootCriterion.evidenceRefs,
+        rootCriterion.rootWriteObservationId,
+        rootCriterion.statementId,
+        rootCriterion.rootRelationId,
+        rootCriterion.outputExpressionId,
+        rootCriterion.outputBindingId,
+        localRootCriterion.rootWriteObservationId,
+        localRootCriterion.statementId,
+        localRootCriterion.rootRelationId,
+        localRootCriterion.outputExpressionId,
+        localRootCriterion.outputBindingId,
+      ],
+      (value) => value,
+    );
+    const gapId = `semantic-gap:${sha256(
+      canonicalJson({
+        rootCriterionId: rootCriterion.rootCriterionId,
+        reasonCode: "SEMANTIC_SCOPE_INCOMPLETE",
+        evidenceRefs,
+      }),
+    )}`;
+    const proofRefs = evidenceRefs.map((ref) =>
+      createProofRef(
+        ref === rootCriterion.rootWriteObservationId
+          ? "WRITE_OBSERVATION"
+          : "CANONICAL_FACT",
+        ref,
+      ),
+    );
     const gap: SemanticDependencyGap = {
       gapId,
       status: "UNKNOWN",
@@ -590,7 +597,8 @@ export function normalizeSemanticDependencies(
       rootCriterionId: rootCriterion.rootCriterionId,
       semanticScopeId: null,
       semanticScope: null,
-      message: "semantic occurrence scope is incomplete or contradicts the root criterion",
+      message:
+        "semantic occurrence scope is incomplete or contradicts the root criterion",
       proofRefs,
       evidenceRefs,
       blocksConfirmedCausality: true,
@@ -635,39 +643,48 @@ export function normalizeSemanticDependencies(
   ): void => {
     const supported = querySupport(queryValue);
     const relationId = relation?.id ?? null;
-    const refs = unique([
-      ...supportRefs,
-      ...root.rootCriterion.evidenceRefs.map((ref) => createProofRef(
-        ref === root.rootCriterion.rootWriteObservationId
-          ? "WRITE_OBSERVATION"
-          : "CANONICAL_FACT",
-        ref,
-      )),
-      ...root.localRootCriterion.evidenceRefs.map((ref) => createProofRef(
-        ref === root.localRootCriterion.rootWriteObservationId
-          ? "WRITE_OBSERVATION"
-          : "CANONICAL_FACT",
-        ref,
-      )),
-      ...(relation
-        ? [
-            factRef("relation", relation.id),
-            sourceSpanRef("relation", relation.id, relation.span),
-          ]
-        : []),
-      ...(supported.gap?.proofRefs ?? supported.cell.proofRefs),
-    ], (ref) => ref.proofRefId);
+    const refs = unique(
+      [
+        ...supportRefs,
+        ...root.rootCriterion.evidenceRefs.map((ref) =>
+          createProofRef(
+            ref === root.rootCriterion.rootWriteObservationId
+              ? "WRITE_OBSERVATION"
+              : "CANONICAL_FACT",
+            ref,
+          ),
+        ),
+        ...root.localRootCriterion.evidenceRefs.map((ref) =>
+          createProofRef(
+            ref === root.localRootCriterion.rootWriteObservationId
+              ? "WRITE_OBSERVATION"
+              : "CANONICAL_FACT",
+            ref,
+          ),
+        ),
+        ...(relation
+          ? [
+              factRef("relation", relation.id),
+              sourceSpanRef("relation", relation.id, relation.span),
+            ]
+          : []),
+        ...(supported.gap?.proofRefs ?? supported.cell.proofRefs),
+      ],
+      (ref) => ref.proofRefId,
+    );
     const semanticScope = relation
       ? semanticScopeForRelation(root.semanticScope, relation.id)
       : root.semanticScope;
-    const gapId = `semantic-gap:${sha256(canonicalJson({
-      rootCriterionId: root.rootCriterion.rootCriterionId,
-      semanticScopeId: semanticScope.semanticScopeId,
-      relationId,
-      queryValue,
-      gapSubject: gapSubject ?? null,
-      message,
-    }))}`;
+    const gapId = `semantic-gap:${sha256(
+      canonicalJson({
+        rootCriterionId: root.rootCriterion.rootCriterionId,
+        semanticScopeId: semanticScope.semanticScopeId,
+        relationId,
+        queryValue,
+        gapSubject: gapSubject ?? null,
+        message,
+      }),
+    )}`;
     gaps.set(gapId, {
       gapId,
       status: supported.gap?.status ?? "UNKNOWN",
@@ -685,7 +702,10 @@ export function normalizeSemanticDependencies(
         ? `${supported.gap.message} ${message}`
         : message,
       proofRefs: refs,
-      evidenceRefs: unique(refs.map((ref) => ref.refId), (ref) => ref),
+      evidenceRefs: unique(
+        refs.map((ref) => ref.refId),
+        (ref) => ref,
+      ),
       blocksConfirmedCausality: true,
       blocksNegativeProof: true,
     });
@@ -706,18 +726,22 @@ export function normalizeSemanticDependencies(
     const refs = unique(
       [
         ...args.proofRefs,
-        ...args.root.rootCriterion.evidenceRefs.map((ref) => createProofRef(
-          ref === args.root.rootCriterion.rootWriteObservationId
-            ? "WRITE_OBSERVATION"
-            : "CANONICAL_FACT",
-          ref,
-        )),
-        ...args.root.localRootCriterion.evidenceRefs.map((ref) => createProofRef(
-          ref === args.root.localRootCriterion.rootWriteObservationId
-            ? "WRITE_OBSERVATION"
-            : "CANONICAL_FACT",
-          ref,
-        )),
+        ...args.root.rootCriterion.evidenceRefs.map((ref) =>
+          createProofRef(
+            ref === args.root.rootCriterion.rootWriteObservationId
+              ? "WRITE_OBSERVATION"
+              : "CANONICAL_FACT",
+            ref,
+          ),
+        ),
+        ...args.root.localRootCriterion.evidenceRefs.map((ref) =>
+          createProofRef(
+            ref === args.root.localRootCriterion.rootWriteObservationId
+              ? "WRITE_OBSERVATION"
+              : "CANONICAL_FACT",
+            ref,
+          ),
+        ),
         factRef("relation", args.relation.id),
         sourceSpanRef("relation", args.relation.id, args.relation.span),
         ...support.cell.proofRefs,
@@ -1313,14 +1337,20 @@ export function normalizeSemanticDependencies(
     if (demandedPhysical.size > 0 && expressionPhysical.size > 0)
       return [...demandedPhysical].some((key) => expressionPhysical.has(key));
     const qualifiers = new Set(
-      demandColumns.map((column) => normalized(column.qualifier)).filter(Boolean),
+      demandColumns
+        .map((column) => normalized(column.qualifier))
+        .filter(Boolean),
     );
     if (qualifiers.size === 0) return true;
-    const relationQualifiers = new Set([
-      ...text(relation.id).split("."),
-      ...text(relation.scope_id).split("."),
-      relation.type === "read" ? text(relation.binding) : "",
-    ].map(normalized).filter(Boolean));
+    const relationQualifiers = new Set(
+      [
+        ...text(relation.id).split("."),
+        ...text(relation.scope_id).split("."),
+        relation.type === "read" ? text(relation.binding) : "",
+      ]
+        .map(normalized)
+        .filter(Boolean),
+    );
     return [...qualifiers].some((qualifier) =>
       relationQualifiers.has(qualifier),
     );
@@ -1369,8 +1399,10 @@ export function normalizeSemanticDependencies(
     }
     if (selected.length > 0)
       return {
-        expressions: unique(selected, (expression) =>
-          `${normalized(expression.output)}\u0000${expression.span.start}\u0000${expression.span.end}`,
+        expressions: unique(
+          selected,
+          (expression) =>
+            `${normalized(expression.output)}\u0000${expression.span.start}\u0000${expression.span.end}`,
         ),
         ambiguousOutput: null,
         ambiguousMatchCount: 0,
@@ -1408,7 +1440,9 @@ export function normalizeSemanticDependencies(
     return { names: new Set([name]), columns: [] };
   }
 
-  function demandTerms(demand: Exclude<OutputDemand, null>): readonly Exclude<OutputDemand, null>[] {
+  function demandTerms(
+    demand: Exclude<OutputDemand, null>,
+  ): readonly Exclude<OutputDemand, null>[] {
     if (demand.columns.length > 0)
       return demand.columns.map((column) => oneTermDemand(column));
     return [...demand.names]
@@ -1427,8 +1461,7 @@ export function normalizeSemanticDependencies(
     if (relation.type === "project" || relation.type === "aggregate") {
       const selection = expressionSelection(relation, demand, true);
       return (
-        selection.expressions.length > 0 ||
-        selection.ambiguousOutput !== null
+        selection.expressions.length > 0 || selection.ambiguousOutput !== null
       );
     }
     if (relation.type === "read") {
@@ -1446,10 +1479,7 @@ export function normalizeSemanticDependencies(
           .map((column) => normalized(column.qualifier))
           .filter(Boolean),
       );
-      if (
-        qualifiers.size > 0 &&
-        qualifiers.has(normalized(relation.binding))
-      )
+      if (qualifiers.size > 0 && qualifiers.has(normalized(relation.binding)))
         return true;
       return demandedPhysical.size === 0 && qualifiers.size === 0;
     }
@@ -1506,31 +1536,34 @@ export function normalizeSemanticDependencies(
         current.demandedOutputs,
       );
       if (relation.type === "project" || relation.type === "aggregate") {
-        const selection = current.relationId === targetRelationId
-          ? (() : ExpressionSelectionResult => {
-              const expressions = relation.type === "project"
-                ? relation.expressions ?? []
-                : relation.measures ?? [];
-              const expression = expressions[root.sourceOrdinal];
-              const expectedId = `${relation.id}:expression:${root.expressionRole.toLowerCase()}:${root.sourceOrdinal}`;
-              if (
-                !expression ||
-                expectedId !== root.localOutputExpressionId ||
-                (root.outputName !== null &&
-                  normalized(expression.output) !== normalized(root.outputName))
-              )
+        const selection =
+          current.relationId === targetRelationId
+            ? ((): ExpressionSelectionResult => {
+                const expressions =
+                  relation.type === "project"
+                    ? (relation.expressions ?? [])
+                    : (relation.measures ?? []);
+                const expression = expressions[root.sourceOrdinal];
+                const expectedId = `${relation.id}:expression:${root.expressionRole.toLowerCase()}:${root.sourceOrdinal}`;
+                if (
+                  !expression ||
+                  expectedId !== root.localOutputExpressionId ||
+                  (root.outputName !== null &&
+                    normalized(expression.output) !==
+                      normalized(root.outputName))
+                )
+                  return {
+                    expressions: [],
+                    ambiguousOutput: null,
+                    ambiguousMatchCount: 0,
+                  };
                 return {
-                  expressions: [],
+                  expressions: [expression],
                   ambiguousOutput: null,
                   ambiguousMatchCount: 0,
                 };
-              return {
-                expressions: [expression],
-                ambiguousOutput: null,
-                ambiguousMatchCount: 0,
-              };
-            })()
-          : expressionSelection(relation, current.demandedOutputs);
+              })()
+            : expressionSelection(relation, current.demandedOutputs);
         const selected = selection.expressions;
         if (selection.ambiguousOutput !== null) {
           ambiguousSelectionsByRelation.add(relation.id);
@@ -1989,10 +2022,7 @@ export function normalizeSemanticDependencies(
           return branchRelation ? relationOutputArity(branchRelation) : 0;
         }),
       );
-      if (
-        ["UNION", "INTERSECT", "EXCEPT"].includes(variant) &&
-        outputArity > 1
-      )
+      if (["UNION", "INTERSECT", "EXCEPT"].includes(variant) && outputArity > 1)
         addGap(
           root,
           relation,

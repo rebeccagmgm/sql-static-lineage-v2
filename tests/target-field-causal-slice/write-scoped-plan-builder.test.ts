@@ -5,10 +5,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Schema } from "sqllens";
-import {
-  MACHINE_FACTS_CONTRACT_VERSION,
-  sha256,
-} from "../../scripts/machine-facts/machine-facts-contract.ts";
+import { sha256Hex as sha256 } from "../../src/contracts/sha256.js";
+import { MACHINE_FACTS_CONTRACT_VERSION } from "../../scripts/machine-facts/machine-facts-contract.ts";
 import * as planAdapter from "../../scripts/plans/plan-adapter.ts";
 import type { CurrentBundleLoad } from "../../scripts/query/current-task-bundle.ts";
 import * as semanticNormalizer from "../../scripts/reconcile/consumer/target-field-causal-slice/semantic-dependency-normalizer.ts";

@@ -1,10 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  canonicalJson,
-  sha256,
-} from "../../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 import type {
   CandidateBranch,
   CandidatePhysicalTable,
@@ -15,9 +13,7 @@ import {
   loadUnionContinuationCandidateSource,
   type UnionContinuationCandidateSource,
 } from "./union-continuation-candidate-source.ts";
-import type {
-  TargetTableCausalClosureArtifact,
-} from "./artifact-contract.ts";
+import type { TargetTableCausalClosureArtifact } from "./artifact-contract.ts";
 
 export const GATE_B_UNION_L1_SET_SCHEMA_VERSION = "1.0.0" as const;
 export const GATE_B_UNION_L1_SET_ARTIFACT_TYPE =
@@ -159,9 +155,18 @@ function readClosureArtifact(path: string): TargetTableCausalClosureArtifact {
   }
   const targetWrite = asRecord(source.targetWrite, "targetWrite");
   const targetIdentity = asRecord(targetWrite.identity, "targetWrite.identity");
-  const targetTaskId = text(targetIdentity.taskId, "targetWrite.identity.taskId");
-  const candidateUniverse = asRecord(source.candidateUniverse, "candidateUniverse");
-  if (text(candidateUniverse.rootTaskId, "candidateUniverse.rootTaskId") !== targetTaskId) {
+  const targetTaskId = text(
+    targetIdentity.taskId,
+    "targetWrite.identity.taskId",
+  );
+  const candidateUniverse = asRecord(
+    source.candidateUniverse,
+    "candidateUniverse",
+  );
+  if (
+    text(candidateUniverse.rootTaskId, "candidateUniverse.rootTaskId") !==
+    targetTaskId
+  ) {
     throw new Error("GATE_B_UNION_CLOSURE_ROOT_TASK_MISMATCH");
   }
   array(candidateUniverse.branches, "candidateUniverse.branches");
@@ -172,13 +177,20 @@ function readOccurrenceChain(
   value: CandidateReadOccurrence | null,
   branchId: string,
 ): GateBUnionReadOccurrenceChain {
-  if (!value) throw new Error(`GATE_B_UNION_L1_BRANCH_INVALID:${branchId}:readOccurrence`);
+  if (!value)
+    throw new Error(
+      `GATE_B_UNION_L1_BRANCH_INVALID:${branchId}:readOccurrence`,
+    );
   return {
     occurrenceId: value.occurrenceId,
     readRelationId: value.readRelationId,
     statementIndex: value.statementIndex,
-    ...(value.sqlSourceId === undefined ? {} : { sqlSourceId: value.sqlSourceId }),
-    ...(value.rootRelationId === undefined ? {} : { rootRelationId: value.rootRelationId }),
+    ...(value.sqlSourceId === undefined
+      ? {}
+      : { sqlSourceId: value.sqlSourceId }),
+    ...(value.rootRelationId === undefined
+      ? {}
+      : { rootRelationId: value.rootRelationId }),
     relationPath: [...value.relationPath],
   };
 }
@@ -207,7 +219,10 @@ function l1Candidate(
   ) {
     return null;
   }
-  const occurrence = readOccurrenceChain(branch.readOccurrence, branch.candidateBranchId);
+  const occurrence = readOccurrenceChain(
+    branch.readOccurrence,
+    branch.candidateBranchId,
+  );
   const expectedEntryRef = `union-continuation-index:${source.index.contentHash}:entry:${branch.consumerTaskId}:${occurrence.occurrenceId}`;
   if (continuation.indexEntryRef !== expectedEntryRef) {
     throw new Error(
@@ -219,7 +234,9 @@ function l1Candidate(
     occurrence.occurrenceId,
   );
   if (!entry) {
-    throw new Error(`GATE_B_UNION_INDEX_ENTRY_MISSING:${branch.candidateBranchId}`);
+    throw new Error(
+      `GATE_B_UNION_INDEX_ENTRY_MISSING:${branch.candidateBranchId}`,
+    );
   }
   const candidates = entry.candidates.filter(
     (candidate) =>
@@ -297,7 +314,15 @@ function memberFor(
   };
 }
 
-function memberKey(member: Pick<GateBUnionL1Member, "consumerTaskId" | "producerTaskId" | "writeObservationId" | "readOccurrenceChain">): string {
+function memberKey(
+  member: Pick<
+    GateBUnionL1Member,
+    | "consumerTaskId"
+    | "producerTaskId"
+    | "writeObservationId"
+    | "readOccurrenceChain"
+  >,
+): string {
   return [
     member.consumerTaskId,
     member.producerTaskId,
@@ -306,11 +331,13 @@ function memberKey(member: Pick<GateBUnionL1Member, "consumerTaskId" | "producer
   ].join("\u0000");
 }
 
-function stableSetBody(input: Omit<GateBUnionL1Set, "contentHash" | "generatedAt">): Omit<GateBUnionL1Set, "contentHash" | "generatedAt"> {
+function stableSetBody(
+  input: Omit<GateBUnionL1Set, "contentHash" | "generatedAt">,
+): Omit<GateBUnionL1Set, "contentHash" | "generatedAt"> {
   return {
     ...input,
-    members: [...input.members].sort(
-      (left, right) => memberKey(left).localeCompare(memberKey(right)),
+    members: [...input.members].sort((left, right) =>
+      memberKey(left).localeCompare(memberKey(right)),
     ),
   };
 }
@@ -339,7 +366,11 @@ export function assertGateBUnionL1Set(value: GateBUnionL1Set): void {
       throw new Error(`GATE_B_UNION_L1_SET_CONTAMINATED:${key}`);
     }
   }
-  const { contentHash: _contentHash, generatedAt: _generatedAt, ...stable } = value;
+  const {
+    contentHash: _contentHash,
+    generatedAt: _generatedAt,
+    ...stable
+  } = value;
   if (sha256(canonicalJson(stable)) !== value.contentHash) {
     throw new Error("GATE_B_UNION_L1_SET_HASH_MISMATCH");
   }
@@ -379,7 +410,8 @@ export function createGateBUnionL1Set(input: {
     );
   }
   const indexedPhysicalProducerCount = branches.filter(
-    (branch) => branch.branchKind === "PHYSICAL_PRODUCER" && branch.continuation,
+    (branch) =>
+      branch.branchKind === "PHYSICAL_PRODUCER" && branch.continuation,
   ).length;
   const body = stableSetBody({
     schemaVersion: GATE_B_UNION_L1_SET_SCHEMA_VERSION,

@@ -2,8 +2,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { canonicalInputPackHash as canonicalHash } from "../../../../src/contracts/canonical-json.js";
 import {
-  canonicalHash,
   type JsonValue,
 } from "../../../input/shared/input-pack.ts";
 import {

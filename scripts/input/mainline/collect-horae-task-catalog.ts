@@ -1,9 +1,10 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { sha256Hex } from "../../../src/contracts/sha256.js";
 import { DEFAULT_SCHEDULE_EVIDENCE_CACHE_ROOT } from "../../reconcile/consumer/one-hop/schedule-evidence-cache.ts";
 import {
   defaultManualTaskIdsFile,
@@ -111,7 +112,7 @@ function stringField(row: JsonRecord, ...names: string[]): string | null {
 }
 
 function contentHash(row: JsonRecord): string {
-  return createHash("sha256").update(JSON.stringify(row), "utf8").digest("hex");
+  return sha256Hex(JSON.stringify(row));
 }
 
 function initializeDatabase(databasePath: string): DatabaseSync {

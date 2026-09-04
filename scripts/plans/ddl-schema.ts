@@ -5,7 +5,8 @@ import {
   type SchemaMapping,
   type SchemaProvider,
 } from "sqllens";
-import { sha256File, validateTableDocument, type TableDocument } from "../input/shared/input-pack.ts";
+import { sha256File } from "../../src/adapters/files/sha256-file.js";
+import { validateTableDocument, type TableDocument } from "../input/shared/input-pack.ts";
 
 export type DdlColumn = {
 	readonly name: string;

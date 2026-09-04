@@ -11,17 +11,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SqlSession } from "sqllens";
+import {
+  canonicalInputPackHash as canonicalHash,
+  canonicalInputPackJson as canonicalJson,
+} from "../src/contracts/canonical-json.js";
+import { sha256Hex as sha256Text } from "../src/contracts/sha256.js";
 import { cases } from "./fixtures/input-pack/cases.ts";
 import {
-  canonicalHash,
-  canonicalJson,
   assertExistingTableLayout,
   createTableDocument,
   createTaskDocument,
   isFrozenScheduleStatus,
   isManualScheduleCycle,
   quarantineMalformedTableDirectories,
-  sha256Text,
   stableTableId,
   validateTableDocument,
   validateTaskDocument,

@@ -1,16 +1,8 @@
-import {
-  existsSync,
-  readFileSync,
-  realpathSync,
-} from "node:fs";
-import {
-  isAbsolute,
-  relative,
-  resolve,
-} from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { isAbsolute, relative, resolve } from "node:path";
 
 import { Schema, SqlSession } from "sqllens";
-import { sha256 } from "../../../machine-facts/machine-facts-contract.ts";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 import {
   globalExpressionId,
   globalRelationId,
@@ -85,16 +77,17 @@ function safeSnapshotPath(factsRoot: string, locator: string): string | null {
     relation.startsWith("../") ||
     isAbsolute(relation) ||
     !existsSync(candidate)
-  ) return null;
+  )
+    return null;
   try {
     const realRoot = realpathSync(root);
     const realCandidate = realpathSync(candidate);
     const realRelation = relative(realRoot, realCandidate);
     return realRelation !== "" &&
-        realRelation !== ".." &&
-        !realRelation.startsWith(`..\\`) &&
-        !realRelation.startsWith("../") &&
-        !isAbsolute(realRelation)
+      realRelation !== ".." &&
+      !realRelation.startsWith(`..\\`) &&
+      !realRelation.startsWith("../") &&
+      !isAbsolute(realRelation)
       ? realCandidate
       : null;
   } catch {
@@ -102,15 +95,20 @@ function safeSnapshotPath(factsRoot: string, locator: string): string | null {
   }
 }
 
-function proofRefs(load: CurrentBundleLoad, root: RootCriterion): readonly string[] {
-  return [...new Set([
-    ...root.evidenceRefs,
-    root.sqlSourceId,
-    root.rootCriterionId,
-    ...(text(load.evidence["manifest.json"])
-      ? [text(load.evidence["manifest.json"])!]
-      : []),
-  ])].sort((left, right) => left.localeCompare(right));
+function proofRefs(
+  load: CurrentBundleLoad,
+  root: RootCriterion,
+): readonly string[] {
+  return [
+    ...new Set([
+      ...root.evidenceRefs,
+      root.sqlSourceId,
+      root.rootCriterionId,
+      ...(text(load.evidence["manifest.json"])
+        ? [text(load.evidence["manifest.json"])!]
+        : []),
+    ]),
+  ].sort((left, right) => left.localeCompare(right));
 }
 
 function gap(
@@ -143,10 +141,7 @@ function expressionsFor(
   return null;
 }
 
-function criterionMatchesPlan(
-  root: RootCriterion,
-  plan: PlanFacts,
-): boolean {
+function criterionMatchesPlan(root: RootCriterion, plan: PlanFacts): boolean {
   if (plan.meta.statement_index !== root.statementIndex) return false;
   const localRelation = localRelationId(
     root.rootTaskId,
@@ -163,10 +158,16 @@ function criterionMatchesPlan(
     !localExpression ||
     localRelation !== root.localRootRelationId ||
     localExpression !== root.localOutputExpressionId ||
-    globalRelationId(root.rootTaskId, root.statementIndex, localRelation) !== root.rootRelationId ||
-    globalExpressionId(root.rootTaskId, root.statementIndex, localExpression) !== root.outputExpressionId ||
+    globalRelationId(root.rootTaskId, root.statementIndex, localRelation) !==
+      root.rootRelationId ||
+    globalExpressionId(
+      root.rootTaskId,
+      root.statementIndex,
+      localExpression,
+    ) !== root.outputExpressionId ||
     !plan.roots.includes(localRelation)
-  ) return false;
+  )
+    return false;
   const relation = plan.relations.find((item) => item.id === localRelation);
   if (!relation) return false;
   const expressions = expressionsFor(relation, root.expressionRole);
@@ -174,17 +175,24 @@ function criterionMatchesPlan(
   const expectedLocalExpression = `${localRelation}:expression:${root.expressionRole.toLowerCase()}:${root.sourceOrdinal}`;
   if (expectedLocalExpression !== localExpression) return false;
   if (root.expressionRole === "SETOP_OUTPUT") {
-    const outputs = relation.type === "setop" && Array.isArray(relation.output_columns)
-      ? relation.output_columns.map(String)
-      : [];
+    const outputs =
+      relation.type === "setop" && Array.isArray(relation.output_columns)
+        ? relation.output_columns.map(String)
+        : [];
     const output = outputs[root.sourceOrdinal];
-    return output !== undefined &&
-      (root.producerOutputName === null || output.toLowerCase() === root.producerOutputName.toLowerCase());
+    return (
+      output !== undefined &&
+      (root.producerOutputName === null ||
+        output.toLowerCase() === root.producerOutputName.toLowerCase())
+    );
   }
   const expression = expressions[root.sourceOrdinal];
-  return expression !== undefined &&
+  return (
+    expression !== undefined &&
     (root.producerOutputName === null ||
-      text(expression.output)?.toLowerCase() === root.producerOutputName.toLowerCase());
+      text(expression.output)?.toLowerCase() ===
+        root.producerOutputName.toLowerCase())
+  );
 }
 
 function groupKey(root: RootCriterion): string {
@@ -210,12 +218,14 @@ export function buildWriteScopedPlans(
       !manifestSnapshot ||
       root.sqlSnapshot !== manifestSnapshot
     ) {
-      gaps.push(gap(
-        input.load,
-        root,
-        "SQL_SNAPSHOT_MISSING_OR_UNSAFE",
-        "root criterion does not reference the current Machine Facts SQL snapshot",
-      ));
+      gaps.push(
+        gap(
+          input.load,
+          root,
+          "SQL_SNAPSHOT_MISSING_OR_UNSAFE",
+          "root criterion does not reference the current Machine Facts SQL snapshot",
+        ),
+      );
       continue;
     }
     if (
@@ -223,50 +233,73 @@ export function buildWriteScopedPlans(
       root.sqlSha256 !== manifestHash ||
       root.sqlSourceId !== `sql:${root.rootTaskId}:${manifestHash}`
     ) {
-      gaps.push(gap(
-        input.load,
-        root,
-        "SQL_SNAPSHOT_HASH_MISMATCH",
-        "root criterion SQL hash/source does not match the current Machine Facts manifest",
-      ));
+      gaps.push(
+        gap(
+          input.load,
+          root,
+          "SQL_SNAPSHOT_HASH_MISMATCH",
+          "root criterion SQL hash/source does not match the current Machine Facts manifest",
+        ),
+      );
       continue;
     }
     eligible.push(root);
   }
   if (eligible.length === 0)
-    return { plans: [], gaps: gaps.sort((left, right) => left.gapId.localeCompare(right.gapId)) };
+    return {
+      plans: [],
+      gaps: gaps.sort((left, right) => left.gapId.localeCompare(right.gapId)),
+    };
 
-  const snapshotPath = safeSnapshotPath(input.load.factsRoot, manifestSnapshot!);
+  const snapshotPath = safeSnapshotPath(
+    input.load.factsRoot,
+    manifestSnapshot!,
+  );
   if (!snapshotPath) {
     for (const root of eligible)
-      gaps.push(gap(
-        input.load,
-        root,
-        "SQL_SNAPSHOT_MISSING_OR_UNSAFE",
-        "current Machine Facts SQL snapshot is missing or outside factsRoot",
-      ));
-    return { plans: [], gaps: gaps.sort((left, right) => left.gapId.localeCompare(right.gapId)) };
+      gaps.push(
+        gap(
+          input.load,
+          root,
+          "SQL_SNAPSHOT_MISSING_OR_UNSAFE",
+          "current Machine Facts SQL snapshot is missing or outside factsRoot",
+        ),
+      );
+    return {
+      plans: [],
+      gaps: gaps.sort((left, right) => left.gapId.localeCompare(right.gapId)),
+    };
   }
   const sqlBytes = readFileSync(snapshotPath);
   if (sha256(sqlBytes) !== manifestHash) {
     for (const root of eligible)
-      gaps.push(gap(
-        input.load,
-        root,
-        "SQL_SNAPSHOT_HASH_MISMATCH",
-        "current Machine Facts SQL snapshot bytes do not match the manifest hash",
-      ));
-    return { plans: [], gaps: gaps.sort((left, right) => left.gapId.localeCompare(right.gapId)) };
+      gaps.push(
+        gap(
+          input.load,
+          root,
+          "SQL_SNAPSHOT_HASH_MISMATCH",
+          "current Machine Facts SQL snapshot bytes do not match the manifest hash",
+        ),
+      );
+    return {
+      plans: [],
+      gaps: gaps.sort((left, right) => left.gapId.localeCompare(right.gapId)),
+    };
   }
   if (!dialect) {
     for (const root of eligible)
-      gaps.push(gap(
-        input.load,
-        root,
-        "PLAN_BUILD_FAILED",
-        "Machine Facts manifest does not declare the parser dialect",
-      ));
-    return { plans: [], gaps: gaps.sort((left, right) => left.gapId.localeCompare(right.gapId)) };
+      gaps.push(
+        gap(
+          input.load,
+          root,
+          "PLAN_BUILD_FAILED",
+          "Machine Facts manifest does not declare the parser dialect",
+        ),
+      );
+    return {
+      plans: [],
+      gaps: gaps.sort((left, right) => left.gapId.localeCompare(right.gapId)),
+    };
   }
 
   const sql = sqlBytes.toString("utf8");
@@ -276,20 +309,31 @@ export function buildWriteScopedPlans(
   let planSqlText: string;
   try {
     const parserSql = sanitizeSqlForParser(sql);
-    const planSql = sanitizeSqlForParser(maskWithInsertTargetForParser(parserSql.sql));
-    sourceSession = SqlSession.create(parserSql.sql, dialect as never, { schema: input.schema });
-    planSession = SqlSession.create(planSql.sql, dialect as never, { schema: input.schema });
+    const planSql = sanitizeSqlForParser(
+      maskWithInsertTargetForParser(parserSql.sql),
+    );
+    sourceSession = SqlSession.create(parserSql.sql, dialect as never, {
+      schema: input.schema,
+    });
+    planSession = SqlSession.create(planSql.sql, dialect as never, {
+      schema: input.schema,
+    });
     restore = parserSql.restore;
     planSqlText = planSql.sql;
   } catch (error) {
     for (const root of eligible)
-      gaps.push(gap(
-        input.load,
-        root,
-        "PLAN_BUILD_FAILED",
-        `immutable SQL snapshot cannot be parsed: ${error instanceof Error ? error.message : String(error)}`,
-      ));
-    return { plans: [], gaps: gaps.sort((left, right) => left.gapId.localeCompare(right.gapId)) };
+      gaps.push(
+        gap(
+          input.load,
+          root,
+          "PLAN_BUILD_FAILED",
+          `immutable SQL snapshot cannot be parsed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+    return {
+      plans: [],
+      gaps: gaps.sort((left, right) => left.gapId.localeCompare(right.gapId)),
+    };
   }
 
   const groups = new Map<string, RootCriterion[]>();
@@ -307,48 +351,58 @@ export function buildWriteScopedPlans(
     const planCell = planSession.doc.statements[first.statementIndex];
     if (!sourceCell || !planCell) {
       for (const root of roots)
-        gaps.push(gap(
-          input.load,
-          root,
-          "PLAN_STATEMENT_MISSING",
-          `immutable SQL snapshot has no statement at index ${root.statementIndex}`,
-        ));
+        gaps.push(
+          gap(
+            input.load,
+            root,
+            "PLAN_STATEMENT_MISSING",
+            `immutable SQL snapshot has no statement at index ${root.statementIndex}`,
+          ),
+        );
       continue;
     }
     let plan: PlanFacts;
     try {
-      plan = restore(planAdapter.buildPlanFacts(planCell, planSqlText, {
-        statement_index: first.statementIndex,
-        dialect,
-        schema: input.schema,
-        include_expression_dependencies: true,
-      }));
+      plan = restore(
+        planAdapter.buildPlanFacts(planCell, planSqlText, {
+          statement_index: first.statementIndex,
+          dialect,
+          schema: input.schema,
+          include_expression_dependencies: true,
+        }),
+      );
     } catch (error) {
       for (const root of roots)
-        gaps.push(gap(
-          input.load,
-          root,
-          "PLAN_BUILD_FAILED",
-          `statement ${root.statementId} Plan Facts build failed: ${error instanceof Error ? error.message : String(error)}`,
-        ));
+        gaps.push(
+          gap(
+            input.load,
+            root,
+            "PLAN_BUILD_FAILED",
+            `statement ${root.statementId} Plan Facts build failed: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
       continue;
     }
     const matched = roots.filter((root) => criterionMatchesPlan(root, plan));
     for (const root of roots)
       if (!matched.includes(root))
-        gaps.push(gap(
-          input.load,
-          root,
-          "PLAN_SCOPE_MISMATCH",
-          "rebuilt Plan Facts does not match the proven statement/relation/expression occurrence",
-        ));
+        gaps.push(
+          gap(
+            input.load,
+            root,
+            "PLAN_SCOPE_MISMATCH",
+            "rebuilt Plan Facts does not match the proven statement/relation/expression occurrence",
+          ),
+        );
     if (matched.length > 0)
       plans.push({
         sqlSourceId: first.sqlSourceId,
         statementId: first.statementId,
         statementIndex: first.statementIndex,
         plan,
-        rootCriteria: matched.sort((left, right) => left.rootCriterionId.localeCompare(right.rootCriterionId)),
+        rootCriteria: matched.sort((left, right) =>
+          left.rootCriterionId.localeCompare(right.rootCriterionId),
+        ),
       });
   }
   return {

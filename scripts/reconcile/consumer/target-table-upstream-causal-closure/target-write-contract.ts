@@ -1,4 +1,5 @@
-import { canonicalJson, sha256 } from "../../../machine-facts/machine-facts-contract.ts";
+import { causalTargetWriteId } from "../../../../src/contracts/identity.js";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 import type { CurrentBundleLoad } from "../../../query/current-task-bundle.ts";
 import {
   resolveCanonicalTargetWriteOccurrence,
@@ -70,7 +71,9 @@ function gap(
     gapId: `target-write-gap:${taskId}:${reasonCode}:${sha256(message)}`,
     reasonCode,
     message,
-    evidenceRefs: [...new Set(evidenceRefs)].sort((left, right) => left.localeCompare(right)),
+    evidenceRefs: [...new Set(evidenceRefs)].sort((left, right) =>
+      left.localeCompare(right),
+    ),
   };
 }
 
@@ -120,13 +123,14 @@ function gapForCanonicalFailure(
       evidenceRefs,
     );
   }
-  const message = resolution.reasonCode === "WRITE_OBSERVATION_MISSING"
-    ? `write observation ${input.writeObservationIds.join(",")} is not present in canonical dataset-io evidence`
-    : resolution.reasonCode === "WRITE_OBSERVATION_CONFLICT"
-    ? `write observation ${input.writeObservationIds.join(",")} has multiple canonical dataset-io records`
-    : resolution.reasonCode === "BUNDLE_NOT_CANONICAL"
-    ? `canonical Machine Facts bundle is unavailable for task ${input.taskId}`
-    : "an explicit canonical write observation is required";
+  const message =
+    resolution.reasonCode === "WRITE_OBSERVATION_MISSING"
+      ? `write observation ${input.writeObservationIds.join(",")} is not present in canonical dataset-io evidence`
+      : resolution.reasonCode === "WRITE_OBSERVATION_CONFLICT"
+        ? `write observation ${input.writeObservationIds.join(",")} has multiple canonical dataset-io records`
+        : resolution.reasonCode === "BUNDLE_NOT_CANONICAL"
+          ? `canonical Machine Facts bundle is unavailable for task ${input.taskId}`
+          : "an explicit canonical write observation is required";
   return gap(
     input.taskId,
     "TARGET_WRITE_EVIDENCE_MISSING",
@@ -164,7 +168,7 @@ export function resolveTargetWrite(
   };
   const identity: TargetWriteIdentity = {
     ...identityInput,
-    targetWriteId: `target-write:${sha256(canonicalJson(identityInput))}`,
+    targetWriteId: causalTargetWriteId(identityInput),
     evidenceRefs: occurrence.evidenceRefs,
   };
   return { ref: { identity, snapshot: input.snapshot }, gaps: [] };

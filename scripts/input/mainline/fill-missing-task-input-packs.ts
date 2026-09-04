@@ -9,8 +9,8 @@ import {
   resolve,
 } from "node:path";
 
+import { sha256File } from "../../../src/adapters/files/sha256-file.js";
 import {
-  sha256File,
   validateTaskDocument,
   type TaskDocument,
 } from "../shared/input-pack.ts";

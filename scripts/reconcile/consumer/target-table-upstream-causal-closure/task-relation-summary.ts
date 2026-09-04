@@ -1,4 +1,5 @@
-import { canonicalJson, sha256 } from "../../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../../src/contracts/canonical-json.js";
+import { sha256Hex as sha256 } from "../../../../src/contracts/sha256.js";
 import {
   qualifyBareTableName,
   type TaskDefaultSchema,
@@ -54,22 +55,24 @@ export interface TaskRelationSummary {
 
 function record(value: unknown): JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as JsonRecord
+    ? (value as JsonRecord)
     : {};
 }
 
 function records(value: unknown): readonly JsonRecord[] {
-  return Array.isArray(value)
-    ? value.map(record)
-    : [];
+  return Array.isArray(value) ? value.map(record) : [];
 }
 
 function text(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
 }
 
 function integer(value: unknown): number | null {
-  return typeof value === "number" && Number.isSafeInteger(value) ? value : null;
+  return typeof value === "number" && Number.isSafeInteger(value)
+    ? value
+    : null;
 }
 
 export function canonicalSqlSourceId(value: string): string {
@@ -101,11 +104,27 @@ export function summaryForOccurrence(
 ): TaskRelationSummary | undefined {
   if (!taskId || !sqlSourceId || statementIndex === null) return undefined;
   const source = canonicalSqlSourceId(sqlSourceId);
-  const scoped = rootRelationId ? summaries.get(relationSummaryKey(taskId, source, statementIndex, rootRelationId)) : undefined;
-  if (scoped?.taskId === taskId && scoped.sqlSourceId === source && scoped.statementIndex === statementIndex) return scoped;
+  const scoped = rootRelationId
+    ? summaries.get(
+        relationSummaryKey(taskId, source, statementIndex, rootRelationId),
+      )
+    : undefined;
+  if (
+    scoped?.taskId === taskId &&
+    scoped.sqlSourceId === source &&
+    scoped.statementIndex === statementIndex
+  )
+    return scoped;
   if (rootRelationId) return undefined;
-  const summary = summaries.get(relationSummaryKey(taskId, source, statementIndex));
-  if (summary?.taskId === taskId && summary.sqlSourceId === source && summary.statementIndex === statementIndex) return summary;
+  const summary = summaries.get(
+    relationSummaryKey(taskId, source, statementIndex),
+  );
+  if (
+    summary?.taskId === taskId &&
+    summary.sqlSourceId === source &&
+    summary.statementIndex === statementIndex
+  )
+    return summary;
   return undefined;
 }
 
@@ -123,7 +142,9 @@ function sourceIdFromId(value: string | null): string | null {
 }
 
 function sorted(values: readonly string[]): readonly string[] {
-  return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  return [...new Set(values.filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b),
+  );
 }
 
 function relationOf(row: JsonRecord): JsonRecord {
@@ -135,21 +156,33 @@ function relationId(row: JsonRecord): string | null {
 }
 
 function relationType(row: JsonRecord): string | null {
-  return (text(row.relation_type) ?? text(relationOf(row).type))?.toLowerCase() ?? null;
+  return (
+    (text(row.relation_type) ?? text(relationOf(row).type))?.toLowerCase() ??
+    null
+  );
 }
 
 function readOccurrenceId(row: JsonRecord): string | null {
   const relation = relationOf(row);
-  return text(relation.read_occurrence_id) ?? text(relation.id) ?? relationId(row);
+  return (
+    text(relation.read_occurrence_id) ?? text(relation.id) ?? relationId(row)
+  );
 }
 
 function childRelationIds(row: JsonRecord): readonly string[] {
   const relation = relationOf(row);
-  const direct = [relation.source, relation.input, relation.left, relation.right]
+  const direct = [
+    relation.source,
+    relation.input,
+    relation.left,
+    relation.right,
+  ]
     .map(text)
     .filter((value): value is string => value !== null);
   const branches = Array.isArray(relation.branches)
-    ? relation.branches.filter((value): value is string => typeof value === "string")
+    ? relation.branches.filter(
+        (value): value is string => typeof value === "string",
+      )
     : [];
   return sorted([...direct, ...branches]);
 }
@@ -177,15 +210,27 @@ function tableMatches(left: string, right: string): boolean {
 
 function physicalColumnTables(row: JsonRecord): readonly string[] {
   const relation = relationOf(row);
-  const columns = [...records(relation.predicate_columns), ...records(relation.condition_columns)];
-  return sorted(columns.flatMap((column) => records(column.physical).map((item) => text(item.table)).filter((value): value is string => value !== null)));
+  const columns = [
+    ...records(relation.predicate_columns),
+    ...records(relation.condition_columns),
+  ];
+  return sorted(
+    columns.flatMap((column) =>
+      records(column.physical)
+        .map((item) => text(item.table))
+        .filter((value): value is string => value !== null),
+    ),
+  );
 }
 
 function columnNames(columns: readonly JsonRecord[]): readonly string[] {
-  return sorted(columns.flatMap((column) => [
-    text(column.column),
-    text(column.name),
-  ].filter((value): value is string => value !== null)));
+  return sorted(
+    columns.flatMap((column) =>
+      [text(column.column), text(column.name)].filter(
+        (value): value is string => value !== null,
+      ),
+    ),
+  );
 }
 
 function physicalColumnNames(row: JsonRecord): readonly string[] {
@@ -218,7 +263,9 @@ function exprText(row: JsonRecord): string {
     text(relation.predicate_display),
     text(relation.condition_display),
     text(row.source_text),
-  ].filter((value): value is string => value !== null).join(" ");
+  ]
+    .filter((value): value is string => value !== null)
+    .join(" ");
 }
 
 function hasFunction(row: JsonRecord, names: readonly string[]): boolean {
@@ -229,7 +276,9 @@ function hasFunction(row: JsonRecord, names: readonly string[]): boolean {
     .filter((value): value is string => value !== null)
     .join(" ");
   const haystack = `${exprText(row)} ${functionNames}`.toUpperCase();
-  return names.some((name) => new RegExp(`\\b${name}\\s*\\(`, "i").test(haystack));
+  return names.some((name) =>
+    new RegExp(`\\b${name}\\s*\\(`, "i").test(haystack),
+  );
 }
 
 function joinSideChannels(joinType: string): {
@@ -242,18 +291,31 @@ function joinSideChannels(joinType: string): {
     "MULTIPLICITY",
     "RELATION_EXISTENCE",
   ];
-  const membershipOnly: readonly ImpactChannel[] = ["ROW_MEMBERSHIP", "RELATION_EXISTENCE"];
+  const membershipOnly: readonly ImpactChannel[] = [
+    "ROW_MEMBERSHIP",
+    "RELATION_EXISTENCE",
+  ];
   // OUTER preserved = driving rows. Dropping a driving row drops output rows.
   // OUTER nullable = padding only: can 1-N or null-fill values, does not delete driving rows.
-  const outerPreserved: readonly ImpactChannel[] = ["ROW_MEMBERSHIP", "RELATION_EXISTENCE"];
-  const outerNullable: readonly ImpactChannel[] = ["MULTIPLICITY", "RELATION_EXISTENCE"];
-  if (kind.includes("CROSS")) return { left: membershipAndCard, right: membershipAndCard };
+  const outerPreserved: readonly ImpactChannel[] = [
+    "ROW_MEMBERSHIP",
+    "RELATION_EXISTENCE",
+  ];
+  const outerNullable: readonly ImpactChannel[] = [
+    "MULTIPLICITY",
+    "RELATION_EXISTENCE",
+  ];
+  if (kind.includes("CROSS"))
+    return { left: membershipAndCard, right: membershipAndCard };
   if (kind.includes("SEMI") || kind.includes("ANTI")) {
     return { left: membershipOnly, right: membershipOnly };
   }
-  if (kind.includes("FULL")) return { left: membershipAndCard, right: membershipAndCard };
-  if (kind.includes("RIGHT")) return { left: outerNullable, right: outerPreserved };
-  if (kind.includes("LEFT")) return { left: outerPreserved, right: outerNullable };
+  if (kind.includes("FULL"))
+    return { left: membershipAndCard, right: membershipAndCard };
+  if (kind.includes("RIGHT"))
+    return { left: outerNullable, right: outerPreserved };
+  if (kind.includes("LEFT"))
+    return { left: outerPreserved, right: outerNullable };
   return { left: membershipAndCard, right: membershipAndCard };
 }
 
@@ -269,15 +331,30 @@ function impactChannels(row: JsonRecord): readonly ImpactChannel[] {
       return sorted([...sides.left, ...sides.right]) as ImpactChannel[];
     }
     case "aggregate":
-      return hasFunction(row, ["COUNT", "SUM", "AVG", "MIN", "MAX", "COLLECT", "ARRAY_AGG"])
+      return hasFunction(row, [
+        "COUNT",
+        "SUM",
+        "AVG",
+        "MIN",
+        "MAX",
+        "COLLECT",
+        "ARRAY_AGG",
+      ])
         ? ["GROUPING", "MULTIPLICITY", "RELATION_EXISTENCE", "FIELD_VALUE"]
         : ["GROUPING", "RELATION_EXISTENCE"];
     case "setop":
       return ["SET_MEMBERSHIP", "RELATION_EXISTENCE"];
     case "project":
-      if (/\b(?:CASE|IF|COALESCE|NVL|DECODE)\b/i.test(expression)) return ["EXPRESSION_CONTROL"];
-      if (/\b(?:COUNT\s*\(\s*\*|EXISTS)\b/i.test(expression)) return ["RELATION_EXISTENCE"];
-      if (/^\s*(?:[-+]?\d+(?:\.\d+)?|'[^']*'|"[^"]*"|NULL)(?:\s+AS?\s+[A-Za-z_][A-Za-z0-9_]*)?\s*$/i.test(expression)) return ["RELATION_EXISTENCE"];
+      if (/\b(?:CASE|IF|COALESCE|NVL|DECODE)\b/i.test(expression))
+        return ["EXPRESSION_CONTROL"];
+      if (/\b(?:COUNT\s*\(\s*\*|EXISTS)\b/i.test(expression))
+        return ["RELATION_EXISTENCE"];
+      if (
+        /^\s*(?:[-+]?\d+(?:\.\d+)?|'[^']*'|"[^"]*"|NULL)(?:\s+AS?\s+[A-Za-z_][A-Za-z0-9_]*)?\s*$/i.test(
+          expression,
+        )
+      )
+        return ["RELATION_EXISTENCE"];
       return [];
     case "window":
       return ["WINDOW_EFFECT"];
@@ -293,13 +370,20 @@ function impactChannels(row: JsonRecord): readonly ImpactChannel[] {
   }
 }
 
-function localTransferKinds(row: JsonRecord, channels: readonly ImpactChannel[]): readonly LocalTransferKind[] {
+function localTransferKinds(
+  row: JsonRecord,
+  channels: readonly ImpactChannel[],
+): readonly LocalTransferKind[] {
   if (channels.length === 0) return [];
   const demanded = operatorDemandColumns(row);
   return [
     "RELATION_OPERATOR",
-    ...(demanded.length > 0 && channels.includes("ROW_MEMBERSHIP") ? ["CONTROL_FIELD_DEMAND" as const] : []),
-    ...(demanded.length > 0 && channels.includes("MULTIPLICITY") ? ["MULTIPLICITY_FIELD_DEMAND" as const] : []),
+    ...(demanded.length > 0 && channels.includes("ROW_MEMBERSHIP")
+      ? ["CONTROL_FIELD_DEMAND" as const]
+      : []),
+    ...(demanded.length > 0 && channels.includes("MULTIPLICITY")
+      ? ["MULTIPLICITY_FIELD_DEMAND" as const]
+      : []),
   ];
 }
 
@@ -309,7 +393,11 @@ function hasUnsupportedShape(row: JsonRecord): boolean {
   // Modeled LATERAL VIEW is type=expand. Field-lineage already binds sibling
   // JOIN columns from Table Pack / default schema; that node must not fail-close
   // every other read in the statement.
-  return type === "other" || Boolean(relation.unsupported) || Boolean(relation.dynamic);
+  return (
+    type === "other" ||
+    Boolean(relation.unsupported) ||
+    Boolean(relation.dynamic)
+  );
 }
 
 /** Normalize relation facts once per task; it never parses raw SQL. */
@@ -327,9 +415,14 @@ export function summarizeTaskRelations(input: {
   const statementSources = new Map<string, string>();
   for (const statement of input.statementRecords ?? []) {
     const id = text(statement.statement_id);
-    const index = integer(statement.statement_index) ?? statementIndexFromId(id);
+    const index =
+      integer(statement.statement_index) ?? statementIndexFromId(id);
     const source = canonicalSqlSourceId(
-      text(statement.sql_source_id) ?? text(statement.sqlSourceId) ?? text(statement.source_id) ?? id ?? "unknown",
+      text(statement.sql_source_id) ??
+        text(statement.sqlSourceId) ??
+        text(statement.source_id) ??
+        id ??
+        "unknown",
     );
     if (id && index !== null) {
       statementIndexes.set(id, index);
@@ -338,7 +431,8 @@ export function summarizeTaskRelations(input: {
   }
   const rowStatementIndex = (row: JsonRecord): number | null => {
     const relation = relationOf(row);
-    const explicit = integer(row.statement_index) ?? integer(relation.statement_index);
+    const explicit =
+      integer(row.statement_index) ?? integer(relation.statement_index);
     if (explicit !== null) return explicit;
     const ids = [
       text(row.statement_id),
@@ -373,18 +467,29 @@ export function summarizeTaskRelations(input: {
     }
     return "unknown";
   };
-  const requestedSourceId = input.sqlSourceId ? canonicalSqlSourceId(input.sqlSourceId) : null;
+  const requestedSourceId = input.sqlSourceId
+    ? canonicalSqlSourceId(input.sqlSourceId)
+    : null;
   const requestedStatementIndex = input.statementIndex ?? null;
   const allRows = input.relationRecords.filter((row) => {
-    if (text(row.task_id) !== null && text(row.task_id) !== input.taskId) return false;
-    if (requestedStatementIndex !== null && rowStatementIndex(row) !== requestedStatementIndex) return false;
+    if (text(row.task_id) !== null && text(row.task_id) !== input.taskId)
+      return false;
+    if (
+      requestedStatementIndex !== null &&
+      rowStatementIndex(row) !== requestedStatementIndex
+    )
+      return false;
     return requestedSourceId === null || rowSourceId(row) === requestedSourceId;
   });
-  const allRowIds = new Set(allRows.map(relationId).filter((value): value is string => value !== null));
+  const allRowIds = new Set(
+    allRows.map(relationId).filter((value): value is string => value !== null),
+  );
   const allEdges = (input.relationEdgeRecords ?? []).filter((edge) => {
     const from = text(edge.from_relation_id);
     const to = text(edge.to_relation_id);
-    return from !== null && to !== null && allRowIds.has(from) && allRowIds.has(to);
+    return (
+      from !== null && to !== null && allRowIds.has(from) && allRowIds.has(to)
+    );
   });
   const childrenByParent = new Map<string, string[]>();
   for (const edge of allEdges) {
@@ -396,25 +501,28 @@ export function summarizeTaskRelations(input: {
     childrenByParent.set(to, children);
   }
   const requestedRoot = input.rootRelationId ?? null;
-  const selectedRows = requestedRoot === null || allRowIds.has(requestedRoot)
-    ? (() => {
-        if (requestedRoot === null) return allRows;
-        const subtree = new Set<string>();
-        const pending = [requestedRoot];
-        while (pending.length > 0) {
-          const id = pending.pop()!;
-          if (subtree.has(id)) continue;
-          subtree.add(id);
-          pending.push(...(childrenByParent.get(id) ?? []));
-        }
-        return allRows.filter((row) => {
-          const id = relationId(row);
-          return id !== null && subtree.has(id);
-        });
-      })()
-    : [];
+  const selectedRows =
+    requestedRoot === null || allRowIds.has(requestedRoot)
+      ? (() => {
+          if (requestedRoot === null) return allRows;
+          const subtree = new Set<string>();
+          const pending = [requestedRoot];
+          while (pending.length > 0) {
+            const id = pending.pop()!;
+            if (subtree.has(id)) continue;
+            subtree.add(id);
+            pending.push(...(childrenByParent.get(id) ?? []));
+          }
+          return allRows.filter((row) => {
+            const id = relationId(row);
+            return id !== null && subtree.has(id);
+          });
+        })()
+      : [];
   const rows = selectedRows;
-  const rowIds = new Set(rows.map(relationId).filter((value): value is string => value !== null));
+  const rowIds = new Set(
+    rows.map(relationId).filter((value): value is string => value !== null),
+  );
   const edges = allEdges.filter((edge) => {
     const from = text(edge.from_relation_id);
     const to = text(edge.to_relation_id);
@@ -434,12 +542,20 @@ export function summarizeTaskRelations(input: {
     const id = relationId(row);
     if (id) rowsById.set(id, row);
   }
-  const descendantReads = (id: string, seen = new Set<string>()): readonly string[] => {
+  const descendantReads = (
+    id: string,
+    seen = new Set<string>(),
+  ): readonly string[] => {
     if (seen.has(id)) return [];
     seen.add(id);
     const row = rowsById.get(id);
-    if (row && relationType(row) === "read") return [readOccurrenceId(row) ?? id];
-    return sorted((incoming.get(id) ?? []).flatMap((sourceId) => descendantReads(sourceId, seen)));
+    if (row && relationType(row) === "read")
+      return [readOccurrenceId(row) ?? id];
+    return sorted(
+      (incoming.get(id) ?? []).flatMap((sourceId) =>
+        descendantReads(sourceId, seen),
+      ),
+    );
   };
   const readTables = new Map<string, string>();
   for (const row of rows) {
@@ -447,15 +563,33 @@ export function summarizeTaskRelations(input: {
     const id = readOccurrenceId(row);
     const table = text(relationOf(row).table);
     if (id && table) {
-      readTables.set(id, qualifyBareTableName(table, input.defaultSchema ?? null));
+      readTables.set(
+        id,
+        qualifyBareTableName(table, input.defaultSchema ?? null),
+      );
     }
   }
-  const readImpacts = new Map<string, { channels: Set<ImpactChannel>; transferKinds: Set<LocalTransferKind>; demandedFields: Set<string>; refs: Set<string>; gaps: Set<string> }>();
+  const readImpacts = new Map<
+    string,
+    {
+      channels: Set<ImpactChannel>;
+      transferKinds: Set<LocalTransferKind>;
+      demandedFields: Set<string>;
+      refs: Set<string>;
+      gaps: Set<string>;
+    }
+  >();
   const gaps = new Set<string>();
-  const relationIds = rows.map(relationId).filter((value): value is string => value !== null);
-  const relationIdsInEdges = new Set(edges.flatMap((edge) => [
-    text(edge.from_relation_id),
-  ].filter((value): value is string => value !== null)));
+  const relationIds = rows
+    .map(relationId)
+    .filter((value): value is string => value !== null);
+  const relationIdsInEdges = new Set(
+    edges.flatMap((edge) =>
+      [text(edge.from_relation_id)].filter(
+        (value): value is string => value !== null,
+      ),
+    ),
+  );
   const explicitRoots = relationIds
     .filter((value) => /:relation:root(?:\.project|$)/i.test(value))
     .sort((left, right) => left.localeCompare(right));
@@ -466,30 +600,52 @@ export function summarizeTaskRelations(input: {
       return row && relationType(row) !== "read";
     })
     .sort((left, right) => left.localeCompare(right));
-  const rootRelationId = requestedRoot ?? explicitRoots[0] ?? (graphRoots.length === 1 ? graphRoots[0]! : null);
-  if (requestedRoot !== null && !allRowIds.has(requestedRoot)) gaps.add(`relation-summary-gap:${input.taskId}:ROOT_RELATION_NOT_FOUND`);
+  const rootRelationId =
+    requestedRoot ??
+    explicitRoots[0] ??
+    (graphRoots.length === 1 ? graphRoots[0]! : null);
+  if (requestedRoot !== null && !allRowIds.has(requestedRoot))
+    gaps.add(`relation-summary-gap:${input.taskId}:ROOT_RELATION_NOT_FOUND`);
   let statementIndex = requestedStatementIndex ?? 0;
   const sqlSourceId = requestedSourceId ?? rowSourceId(rows[0] ?? {});
-  if (sqlSourceId === "unknown") gaps.add(`relation-summary-gap:${input.taskId}:SQL_SOURCE_ID_UNRESOLVED`);
+  if (sqlSourceId === "unknown")
+    gaps.add(`relation-summary-gap:${input.taskId}:SQL_SOURCE_ID_UNRESOLVED`);
   for (const row of rows) {
     const id = relationId(row);
     const type = relationType(row);
     if (!id || !type) {
-      gaps.add(`relation-summary-gap:${input.taskId}:RELATION_IDENTITY_UNRESOLVED`);
+      gaps.add(
+        `relation-summary-gap:${input.taskId}:RELATION_IDENTITY_UNRESOLVED`,
+      );
       continue;
     }
     const statementId = text(row.statement_id);
     const match = statementId?.match(/statement:(\d+)/i);
     if (match) statementIndex = Number(match[1]);
-    if (type === "read" || childRelationIds(row).length > 0 || incoming.has(id)) {
-      const descendants = type === "read" ? [readOccurrenceId(row) ?? id] : descendantReads(id);
+    if (
+      type === "read" ||
+      childRelationIds(row).length > 0 ||
+      incoming.has(id)
+    ) {
+      const descendants =
+        type === "read" ? [readOccurrenceId(row) ?? id] : descendantReads(id);
       const columnTables = physicalColumnTables(row);
-      const shouldRestrictToColumns = type === "filter" || type === "having" || type === "qualify" || type === "join" || type === "project";
+      const shouldRestrictToColumns =
+        type === "filter" ||
+        type === "having" ||
+        type === "qualify" ||
+        type === "join" ||
+        type === "project";
       const restrict = (readIds: readonly string[]): readonly string[] =>
         shouldRestrictToColumns && columnTables.length > 0
           ? readIds.filter((readId) => {
               const table = readTables.get(readId);
-              return table !== undefined && columnTables.some((columnTable) => tableMatches(table, columnTable));
+              return (
+                table !== undefined &&
+                columnTables.some((columnTable) =>
+                  tableMatches(table, columnTable),
+                )
+              );
             })
           : readIds;
       const apply = (
@@ -501,17 +657,28 @@ export function summarizeTaskRelations(input: {
         const demanded = demandedNames;
         const transfers = localTransferKinds(row, channels);
         for (const readId of restrict(readIds)) {
-          const current = readImpacts.get(readId) ?? { channels: new Set<ImpactChannel>(), transferKinds: new Set<LocalTransferKind>(), demandedFields: new Set<string>(), refs: new Set<string>(), gaps: new Set<string>() };
+          const current = readImpacts.get(readId) ?? {
+            channels: new Set<ImpactChannel>(),
+            transferKinds: new Set<LocalTransferKind>(),
+            demandedFields: new Set<string>(),
+            refs: new Set<string>(),
+            gaps: new Set<string>(),
+          };
           for (const channel of channels) current.channels.add(channel);
-          for (const transferKind of transfers) current.transferKinds.add(transferKind);
-          for (const fieldName of demanded) current.demandedFields.add(fieldName);
+          for (const transferKind of transfers)
+            current.transferKinds.add(transferKind);
+          for (const fieldName of demanded)
+            current.demandedFields.add(fieldName);
           current.refs.add(`machine-facts:${input.taskId}:relation:${id}`);
           if (hasUnsupportedShape(row)) {
             const gap = `relation-summary-gap:${input.taskId}:${id}:UNSUPPORTED_OPERATOR`;
             current.gaps.add(gap);
             gaps.add(gap);
           }
-          for (const sourceId of sourceRelationIds(row, incoming)) current.refs.add(`machine-facts:${input.taskId}:relation:${sourceId}`);
+          for (const sourceId of sourceRelationIds(row, incoming))
+            current.refs.add(
+              `machine-facts:${input.taskId}:relation:${sourceId}`,
+            );
           readImpacts.set(readId, current);
         }
       };
@@ -523,16 +690,37 @@ export function summarizeTaskRelations(input: {
         apply(descendantReads(leftId), sides.left);
         apply(descendantReads(rightId), sides.right);
       } else if (type === "project") {
-        apply(descendants, impactChannels(row).filter((channel) => channel !== "EXPRESSION_CONTROL"));
+        apply(
+          descendants,
+          impactChannels(row).filter(
+            (channel) => channel !== "EXPRESSION_CONTROL",
+          ),
+        );
       } else {
         apply(descendants, impactChannels(row));
       }
     }
-    if (hasUnsupportedShape(row)) gaps.add(`relation-summary-gap:${input.taskId}:${id}:UNSUPPORTED_OPERATOR`);
+    if (hasUnsupportedShape(row))
+      gaps.add(
+        `relation-summary-gap:${input.taskId}:${id}:UNSUPPORTED_OPERATOR`,
+      );
   }
   const statementRows = (input.statementRecords ?? []).filter((row) => {
-    if (requestedStatementIndex !== null && rowStatementIndex(row) !== requestedStatementIndex) return false;
-    return requestedSourceId === null || canonicalSqlSourceId(text(row.sql_source_id) ?? text(row.sqlSourceId) ?? text(row.source_id) ?? text(row.statement_id) ?? "unknown") === requestedSourceId;
+    if (
+      requestedStatementIndex !== null &&
+      rowStatementIndex(row) !== requestedStatementIndex
+    )
+      return false;
+    return (
+      requestedSourceId === null ||
+      canonicalSqlSourceId(
+        text(row.sql_source_id) ??
+          text(row.sqlSourceId) ??
+          text(row.source_id) ??
+          text(row.statement_id) ??
+          "unknown",
+      ) === requestedSourceId
+    );
   });
   const statementGaps = statementRows.flatMap((row) => {
     const status = text(row.parse_status);
@@ -541,15 +729,25 @@ export function summarizeTaskRelations(input: {
       : [];
   });
   for (const gap of statementGaps) gaps.add(gap);
-  const normalized = [...readImpacts.entries()].map(([readOccurrenceId, value]) => ({
-    readOccurrenceId,
-    impactChannels: [...value.channels].sort(),
-    localTransferKinds: [...value.transferKinds].sort(),
-    demandedFieldNames: [...value.demandedFields].sort(),
-    evidenceRefs: sorted([...value.refs]),
-    gaps: sorted([...value.gaps]),
-  })).sort((a, b) => a.readOccurrenceId.localeCompare(b.readOccurrenceId));
-  const digestInput = { taskId: input.taskId, sqlSourceId, statementIndex, rootRelationId, normalized, relationCount: rows.length, edgeCount: edges.length };
+  const normalized = [...readImpacts.entries()]
+    .map(([readOccurrenceId, value]) => ({
+      readOccurrenceId,
+      impactChannels: [...value.channels].sort(),
+      localTransferKinds: [...value.transferKinds].sort(),
+      demandedFieldNames: [...value.demandedFields].sort(),
+      evidenceRefs: sorted([...value.refs]),
+      gaps: sorted([...value.gaps]),
+    }))
+    .sort((a, b) => a.readOccurrenceId.localeCompare(b.readOccurrenceId));
+  const digestInput = {
+    taskId: input.taskId,
+    sqlSourceId,
+    statementIndex,
+    rootRelationId,
+    normalized,
+    relationCount: rows.length,
+    edgeCount: edges.length,
+  };
   return {
     taskId: input.taskId,
     sqlSourceId,

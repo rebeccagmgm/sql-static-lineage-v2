@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { canonicalJson } from "../../machine-facts/machine-facts-contract.ts";
+import { canonicalMachineFactsJson as canonicalJson } from "../../../src/contracts/canonical-json.js";
 import { expandAnchorUpstreamTaskIds } from "./anchor-upstream-expansion.ts";
 import { selectTaskLocalBatchTaskIds } from "./batch-selection.ts";
 import { projectTaskLocalBatch } from "./project-task-local-batch.ts";
@@ -41,9 +41,10 @@ export function parseProjectTaskLocalCli(
 ): ProjectTaskLocalCliOptions {
   const dataRoot = option(args, "--data-root");
   const factsRoot = option(args, "--facts-root");
-  const scheduleCacheRoot = option(args, "--schedule-cache")
-    ?? option(args, "--schedule-cache-root")
-    ?? option(args, "--schedule-evidence-cache-root");
+  const scheduleCacheRoot =
+    option(args, "--schedule-cache") ??
+    option(args, "--schedule-cache-root") ??
+    option(args, "--schedule-evidence-cache-root");
   const outputRoot = option(args, "--output-root");
   const topic = option(args, "--topic");
   const taskIds = csvOption(args, "--task-ids");
@@ -56,8 +57,8 @@ export function parseProjectTaskLocalCli(
     ? Number(maxUpstreamDepthRaw)
     : undefined;
   if (
-    maxUpstreamDepth !== undefined
-    && (!Number.isSafeInteger(maxUpstreamDepth) || maxUpstreamDepth < 1)
+    maxUpstreamDepth !== undefined &&
+    (!Number.isSafeInteger(maxUpstreamDepth) || maxUpstreamDepth < 1)
   ) {
     throw new Error("MAX_UPSTREAM_DEPTH_INVALID");
   }
@@ -75,7 +76,9 @@ export function parseProjectTaskLocalCli(
     throw new Error("EXPAND_UPSTREAM_REQUIRES_TASK_IDS");
   }
   if (args.includes("--prepare-facts")) {
-    throw new Error("PREPARE_FACTS_UNSUPPORTED: TL-5 defaults to --no-prepare-facts; omit --prepare-facts");
+    throw new Error(
+      "PREPARE_FACTS_UNSUPPORTED: TL-5 defaults to --no-prepare-facts; omit --prepare-facts",
+    );
   }
   return {
     dataRoot: resolve(dataRoot),
@@ -85,7 +88,9 @@ export function parseProjectTaskLocalCli(
     topic,
     taskIds,
     expandUpstream,
-    writerCatalogPath: writerCatalogPath ? resolve(writerCatalogPath) : undefined,
+    writerCatalogPath: writerCatalogPath
+      ? resolve(writerCatalogPath)
+      : undefined,
     producerIndexRoot,
     maxUpstreamDepth,
     alsoTaskIds,
@@ -105,7 +110,8 @@ export function runProjectTaskLocalCli(options: ProjectTaskLocalCliOptions): {
     taskIds: options.taskIds,
     alsoTaskIds: options.alsoTaskIds,
   });
-  let upstreamExpansion: ReturnType<typeof expandAnchorUpstreamTaskIds> | null = null;
+  let upstreamExpansion: ReturnType<typeof expandAnchorUpstreamTaskIds> | null =
+    null;
   const batchTaskIds = options.expandUpstream
     ? (() => {
         upstreamExpansion = expandAnchorUpstreamTaskIds({
@@ -115,10 +121,11 @@ export function runProjectTaskLocalCli(options: ProjectTaskLocalCliOptions): {
           producerIndexRoot: options.producerIndexRoot,
           maxDepth: options.maxUpstreamDepth,
         });
-        return [...new Set([
-          ...upstreamExpansion.taskIds,
-          ...selection.alsoTaskIds,
-        ])].sort((left, right) => left.localeCompare(right, "en-US", { numeric: true }));
+        return [
+          ...new Set([...upstreamExpansion.taskIds, ...selection.alsoTaskIds]),
+        ].sort((left, right) =>
+          left.localeCompare(right, "en-US", { numeric: true }),
+        );
       })()
     : selection.taskIds;
   if (batchTaskIds.length === 0) {
@@ -180,14 +187,21 @@ export function runProjectTaskLocalCli(options: ProjectTaskLocalCliOptions): {
 function main(argv: readonly string[]): void {
   const options = parseProjectTaskLocalCli(argv.slice(2));
   const result = runProjectTaskLocalCli(options);
-  process.stdout.write(`${canonicalJson({
-    ok: true,
-    batchManifestPath: result.batchManifestPath,
-    taskCount: result.taskIds.length,
-    cache: result.cache,
-  })}\n`);
+  process.stdout.write(
+    `${canonicalJson({
+      ok: true,
+      batchManifestPath: result.batchManifestPath,
+      taskCount: result.taskIds.length,
+      cache: result.cache,
+    })}\n`,
+  );
 }
 
-if (process.argv[1] && /project-task-local(?:-cli)?\.(?:ts|js|mjs|cjs)$/.test(process.argv[1].replaceAll("\\", "/"))) {
+if (
+  process.argv[1] &&
+  /project-task-local(?:-cli)?\.(?:ts|js|mjs|cjs)$/.test(
+    process.argv[1].replaceAll("\\", "/"),
+  )
+) {
   main(process.argv);
 }

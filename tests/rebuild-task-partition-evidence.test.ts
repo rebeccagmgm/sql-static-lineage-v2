@@ -9,8 +9,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { canonicalInputPackHash as canonicalHash } from "../src/contracts/canonical-json.js";
 import {
-  canonicalHash,
   type JsonValue,
   type TaskDocument,
 } from "../scripts/input/shared/input-pack.ts";
