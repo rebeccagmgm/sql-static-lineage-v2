@@ -7,10 +7,9 @@ import {
 } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
 
-import {
-  assembleCacheTaskEvidence,
-} from "../shared/cache-task-evidence.ts";
+import { assembleCacheTaskEvidence } from "../shared/cache-task-evidence.ts";
 import {
   extractOfflineTableCandidates,
   loadOfflineTableCatalog,
@@ -19,17 +18,10 @@ import {
   serviceSuffixFromAtlasDataSource,
   type OfflineTableCatalog,
 } from "../shared/offline-table-resolver.ts";
-import {
-  writeTableInput,
-  type TableEvidence,
-} from "../shared/input-pack.ts";
+import { writeTableInput, type TableEvidence } from "../shared/input-pack.ts";
 import { lookupJsonlByKey } from "../shared/jsonl-offset-index.ts";
 
-const CATEGORIES = new Set([
-  "oracle2hive",
-  "mysql2hive",
-  "postgre2hive",
-]);
+const CATEGORIES = new Set(["oracle2hive", "mysql2hive", "postgre2hive"]);
 const SAFE_TASK_ID = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/u;
 
 type JsonRecord = Record<string, unknown>;
@@ -65,7 +57,10 @@ type ManifestRow = {
   readonly failureClass?: string;
 };
 
-function optionValue(argv: readonly string[], name: string): string | undefined {
+function optionValue(
+  argv: readonly string[],
+  name: string,
+): string | undefined {
   const index = argv.indexOf(name);
   const value = index < 0 ? undefined : argv[index + 1];
   return value !== undefined && !value.startsWith("--") ? value : undefined;
@@ -147,12 +142,23 @@ function appendManifest(path: string, row: ManifestRow): void {
   appendFileSync(path, `${JSON.stringify(row)}\n`, "utf8");
 }
 
-function manifestBase(
+export function manifestBase(
   taskId: string,
   qualifiedName: string,
   observedAt: string,
-): Pick<ManifestRow, "taskId" | "evidenceKind" | "qualifiedName" | "route" | "observedAt"> {
+): Pick<
+  ManifestRow,
+  | "schemaVersion"
+  | "artifactType"
+  | "taskId"
+  | "evidenceKind"
+  | "qualifiedName"
+  | "route"
+  | "observedAt"
+> {
   return {
+    schemaVersion: "1.0.0",
+    artifactType: "INPUT_PACK_PARTIAL_REPAIR_EVIDENCE",
     taskId,
     evidenceKind: "TABLE",
     qualifiedName,
@@ -166,7 +172,10 @@ function targetWorkset(
   cacheRoot: string,
   catalog: OfflineTableCatalog,
 ): Map<string, Target> {
-  const targets = new Map<string, { qualifiedName: string; taskIds: Set<string> }>();
+  const targets = new Map<
+    string,
+    { qualifiedName: string; taskIds: Set<string> }
+  >();
   for (const row of inventory.rows) {
     if (
       row.status !== "PARTIAL" ||
@@ -174,7 +183,8 @@ function targetWorkset(
       !CATEGORIES.has(row.taskCategory) ||
       !row.warnings?.some(
         (warning) =>
-          typeof warning === "string" && warning.endsWith(":RDBMS_CORE_AMBIGUOUS"),
+          typeof warning === "string" &&
+          warning.endsWith(":RDBMS_CORE_AMBIGUOUS"),
       ) ||
       !SAFE_TASK_ID.test(row.taskId)
     )
@@ -212,10 +222,13 @@ function targetWorkset(
     else existing.taskIds.add(row.taskId);
   }
   return new Map(
-    [...targets.entries()].map(([key, target]) => [key, {
-      qualifiedName: target.qualifiedName,
-      taskIds: [...target.taskIds],
-    }]),
+    [...targets.entries()].map(([key, target]) => [
+      key,
+      {
+        qualifiedName: target.qualifiedName,
+        taskIds: [...target.taskIds],
+      },
+    ]),
   );
 }
 
@@ -224,7 +237,11 @@ async function main(): Promise<void> {
   const dataRoot = optionValue(argv, "--data-root");
   const cacheRoot = optionValue(argv, "--cache-root");
   const inventoryPath = optionValue(argv, "--inventory");
-  if (dataRoot === undefined || cacheRoot === undefined || inventoryPath === undefined)
+  if (
+    dataRoot === undefined ||
+    cacheRoot === undefined ||
+    inventoryPath === undefined
+  )
     throw new Error("HEAL_REQUIRES_DATA_ROOT_CACHE_ROOT_INVENTORY");
   const manifestPath = resolve(
     optionValue(argv, "--manifest") ??
@@ -239,7 +256,11 @@ async function main(): Promise<void> {
   });
   if (catalog.rdbmsCore === undefined || catalog.rdbmsDdl === undefined)
     throw new Error("RDBMS_SNAPSHOT_CATALOG_MISSING");
-  const targets = targetWorkset(readInventory(resolve(inventoryPath)), cacheRoot, catalog);
+  const targets = targetWorkset(
+    readInventory(resolve(inventoryPath)),
+    cacheRoot,
+    catalog,
+  );
   const keys = new Set(targets.keys());
   const coreRecords = await collectRecords(catalog.rdbmsCore.sourcePath, keys);
   const ddlRecords = await collectRecords(catalog.rdbmsDdl.sourcePath, keys);
@@ -280,17 +301,15 @@ async function main(): Promise<void> {
         "local:rdbms-core-jsonl-duplicate-equivalent,local:rdbms-ddl-jsonl,local:horae-datasource",
         observedAt,
       );
-      if (evidence === undefined) failureClass = "LOCAL_RDBMS_PLATFORM_UNMAPPED";
+      if (evidence === undefined)
+        failureClass = "LOCAL_RDBMS_PLATFORM_UNMAPPED";
     }
     if (evidence === undefined) {
       for (const taskId of target.taskIds)
-        appendManifest(
-          manifestPath,
-          {
-            ...manifestBase(taskId, target.qualifiedName, observedAt),
-            failureClass,
-          },
-        );
+        appendManifest(manifestPath, {
+          ...manifestBase(taskId, target.qualifiedName, observedAt),
+          failureClass,
+        });
       continue;
     }
     const written = writeTableInput(dataRoot, evidence);
@@ -298,15 +317,12 @@ async function main(): Promise<void> {
     if (written.changed) changedPacks += 1;
     affectedTasks += target.taskIds.length;
     for (const taskId of target.taskIds)
-      appendManifest(
-        manifestPath,
-        {
-          ...manifestBase(taskId, evidence.qualifiedName, observedAt),
-          provider: evidence.evidenceProvider,
-          sha256: written.contentHash,
-          changed: written.changed,
-        },
-      );
+      appendManifest(manifestPath, {
+        ...manifestBase(taskId, evidence.qualifiedName, observedAt),
+        provider: evidence.evidenceProvider,
+        sha256: written.contentHash,
+        changed: written.changed,
+      });
   }
   console.log(
     JSON.stringify({
@@ -322,9 +338,16 @@ async function main(): Promise<void> {
   );
 }
 
-try {
-  await main();
-} catch (error) {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
+) {
+  try {
+    await main();
+  } catch (error) {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exitCode = 1;
+  }
 }

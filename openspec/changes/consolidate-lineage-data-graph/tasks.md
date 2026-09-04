@@ -1,15 +1,15 @@
 ## 1. Independent Baseline and Real Build
 
 - [x] 1.1 Add repository ignore rules for dependencies, build output, runtime artifacts, caches, logs, local configuration, and temporary worktrees; verify representative paths are ignored while source, tests, schemas, config examples, OpenSpec, and `docs/` remain visible.
-- [ ] 1.2 Record the source SQL-lineage commit and clean `data-graph` commit, initialize a new Git repository in v2 with no remote, and create the clean baseline commit; verify both original repositories keep their exact pre-existing status and neither old `.git` directory is copied.
-- [ ] 1.3 Define the retained production-source set and replace the import-only build with a TypeScript build that covers it; verify `npm run build` compiles production source and `npm run typecheck` covers production source plus retained tests before any source move.
-- [ ] 1.4 Freeze small non-skipping lineage stage fixtures for canonical IDs/hashes, Machine Facts, one-hop `1.1.0`, multi-hop `1.1.0`, field-lineage `1.2.0`, task-local `1.3.0`, and target-causal `1.2.0`; verify each fixture runs without sibling data or optional environment variables.
-- [ ] 1.5 Freeze small non-skipping `data-graph` behavior fixtures for continuation-v2, topology/field/causal file queries, and the static view; verify the fixtures assert observable semantics rather than an unavailable historical snapshot hash or a Neo4j mock.
-- [ ] 1.6 Run the pre-move build, typecheck, retained tests, and format check, fix baseline-only configuration defects, and verify any remaining failure has an exact documented cause before structural edits begin.
+- [x] 1.2 Record the source SQL-lineage commit and clean `data-graph` commit, initialize a new Git repository in v2 with no remote, and create the clean baseline commit; verify both original repositories keep their exact pre-existing status and neither old `.git` directory is copied.
+- [x] 1.3 Define the retained production-source set and replace the import-only build with a TypeScript build that covers it; verify `npm run build` compiles production source and `npm run typecheck` covers production source plus retained tests before any source move.
+- [x] 1.4 Freeze small non-skipping lineage stage fixtures for canonical IDs/hashes, Machine Facts, one-hop `1.1.0`, multi-hop `1.1.0`, field-lineage `1.2.0`, task-local `1.3.0`, and target-causal `1.2.0`; verify each fixture runs without sibling data or optional environment variables.
+- [x] 1.5 Freeze small non-skipping `data-graph` behavior fixtures for continuation-v2, topology/field/causal file queries, and the static view; verify the fixtures assert observable semantics rather than an unavailable historical snapshot hash or a Neo4j mock.
+- [x] 1.6 Run the pre-move build, typecheck, retained tests, and format check, fix baseline-only configuration defects, and verify any remaining failure has an exact documented cause before structural edits begin.
 
 ## 2. One Current Contract Source
 
-- [ ] 2.1 Write frozen tests for canonical JSON/hash and Task, physical dataset, physical field, read occurrence, target write, and write-observation identities; verify the expected vectors match the current producers before moving their implementations.
+- [x] 2.1 Write frozen tests for canonical JSON/hash and Task, physical dataset, physical field, read occurrence, target write, and write-observation identities; verify the expected vectors match the current producers before moving their implementations.
 - [ ] 2.2 Move canonical JSON/hash and identity implementations into `src/contracts/`, update current producers to use them, and verify the frozen vectors and artifact hashes are unchanged.
 - [ ] 2.3 Consolidate the current one-hop, multi-hop, field-lineage, target-causal, task-local, continuation-index, and investigation contract types/loaders/validators under `src/contracts/`; verify every accepted version matches the design matrix.
 - [ ] 2.4 Replace duplicate contract/runtime imports in v2 and the selected `data-graph` code, then delete the copied implementations; verify repository search finds exactly one runtime identity/hash implementation and one validator for each retained artifact.

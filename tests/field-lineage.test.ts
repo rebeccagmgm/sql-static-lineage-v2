@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { readJsonlRecords } from "../scripts/machine-facts/jsonl-store.ts";
 import {
   loadPhysicalTableCatalog,
   runInputPackMachineFacts,
@@ -98,13 +99,17 @@ describe("field multi-hop lineage", () => {
       "TASK_LOCAL_SCHEMA_BACKED",
     ]);
     expect(schema.$defs.datasetControl.required).toContain("grainReason");
-    expect(schema.$defs.datasetControl.properties.grainReason.anyOf).toBeDefined();
+    expect(
+      schema.$defs.datasetControl.properties.grainReason.anyOf,
+    ).toBeDefined();
   });
 
   it("rejects legacy rowsetControls nodeId and affectedRootFields", () => {
     const errors = validateFieldLineageArtifact({
       schemaVersion: "1.1.0",
-      rowsetControls: [{ nodeId: "field-node:x", affectedRootFields: ["out_a"] }],
+      rowsetControls: [
+        { nodeId: "field-node:x", affectedRootFields: ["out_a"] },
+      ],
       affectedRootFields: ["out_a"],
     });
     expect(errors.join(" ")).toMatch(/rowsetControls is not allowed/);
@@ -149,7 +154,9 @@ describe("field multi-hop lineage", () => {
     });
     expect(artifact.overallStatus).toBe("PARTIAL");
     expect(
-      artifact.nodes.some((node) => node.evidenceStatus === "PROVISIONAL_LEGACY"),
+      artifact.nodes.some(
+        (node) => node.evidenceStatus === "PROVISIONAL_LEGACY",
+      ),
     ).toBe(true);
     expect(
       artifact.nodes.some((node) => node.evidenceStatus === "CONFIRMED"),
@@ -176,15 +183,14 @@ describe("field multi-hop lineage", () => {
     ).toBe(true);
     expect(artifact.gaps.some((gap) => gap.reasonCode === "CYCLE")).toBe(true);
     expect(
-      artifact.datasetControls.some(
-        (control) => control.subtype === "FILTER",
-      ),
+      artifact.datasetControls.some((control) => control.subtype === "FILTER"),
     ).toBe(true);
     expect(
       artifact.datasetControls.every(
         (control) =>
           control.grain === "PRESERVE" ||
-          (typeof control.grainReason === "string" && control.grainReason.length > 0),
+          (typeof control.grainReason === "string" &&
+            control.grainReason.length > 0),
       ),
     ).toBe(true);
     expect(validateFieldLineageArtifact(artifact)).toEqual([]);
@@ -289,12 +295,14 @@ describe("field multi-hop lineage", () => {
       maxStates: 100,
       maxPaths: 100,
     });
-    expect(artifact.datasetControls.map((control) => control.controlId).sort()).toEqual(
+    expect(
+      artifact.datasetControls.map((control) => control.controlId).sort(),
+    ).toEqual(
       oneField.datasetControls.map((control) => control.controlId).sort(),
     );
-    expect(artifact.datasetControls.every((control) => !("nodeId" in control))).toBe(
-      true,
-    );
+    expect(
+      artifact.datasetControls.every((control) => !("nodeId" in control)),
+    ).toBe(true);
   });
 
   it("skips checkdbflag upstream tasks without turning them into field gaps", () => {
@@ -500,7 +508,11 @@ describe("field multi-hop lineage", () => {
     const tableLineagePath = join(parent, "table-lineage.json");
     const outputPath = join(parent, "field-lineage.json");
     createSyntheticFieldLineageInputPack(dataRoot);
-    writeFileSync(tableLineagePath, `${JSON.stringify(syntheticTableLineage())}\n`, "utf8");
+    writeFileSync(
+      tableLineagePath,
+      `${JSON.stringify(syntheticTableLineage())}\n`,
+      "utf8",
+    );
 
     expect(() =>
       runFieldLineageCli({
@@ -557,19 +569,31 @@ describe("field multi-hop lineage", () => {
         taskNodes: [
           {
             taskId: "1300",
-            upstreamDecision: { primary: ["300", "400"], additional: [], unknown: [] },
+            upstreamDecision: {
+              primary: ["300", "400"],
+              additional: [],
+              unknown: [],
+            },
           },
         ],
         producerBridges: [
           {
             consumerTaskId: "1300",
             producerTaskId: "300",
-            table: { platform: "hive", dataSource: "warehouse", qualifiedName: "demo.source" },
+            table: {
+              platform: "hive",
+              dataSource: "warehouse",
+              qualifiedName: "demo.source",
+            },
           },
           {
             consumerTaskId: "1300",
             producerTaskId: "400",
-            table: { platform: "hive", dataSource: "warehouse", qualifiedName: "demo.source" },
+            table: {
+              platform: "hive",
+              dataSource: "warehouse",
+              qualifiedName: "demo.source",
+            },
           },
         ],
       },
@@ -581,10 +605,13 @@ describe("field multi-hop lineage", () => {
       maxStates: 100,
       maxPaths: 100,
     });
-    expect(artifact.edges.some((edge) => edge.producerTaskId !== null)).toBe(false);
+    expect(artifact.edges.some((edge) => edge.producerTaskId !== null)).toBe(
+      false,
+    );
     expect(
       artifact.candidates.filter(
-        (candidate) => candidate.reasonCode === "SAME_PHYSICAL_TABLE_PRODUCER_NOT_RECURSED",
+        (candidate) =>
+          candidate.reasonCode === "SAME_PHYSICAL_TABLE_PRODUCER_NOT_RECURSED",
       ),
     ).toHaveLength(2);
     expect(artifact.gaps.some((gap) => gap.reasonCode === "CYCLE")).toBe(false);
@@ -627,8 +654,7 @@ describe("field multi-hop lineage", () => {
         partition: null,
         sql: {
           query: {
-            content:
-              "SELECT src_a AS mid_a, src_b AS mid_b FROM demo.source",
+            content: "SELECT src_a AS mid_a, src_b AS mid_b FROM demo.source",
             evidenceProvider: "synthetic:test",
           },
         },
@@ -802,7 +828,7 @@ describe("field multi-hop lineage", () => {
       taskIds: ["100", "201", "202"],
       outputRoot: f.factsRoot,
     });
-    const relationNodes = readFileSync(
+    const relationNodes = readJsonlRecords(
       join(
         f.factsRoot,
         "registry",
@@ -811,12 +837,7 @@ describe("field multi-hop lineage", () => {
         "bundle",
         "relation-nodes.jsonl",
       ),
-      "utf8",
-    )
-      .trim()
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .map((line) => JSON.parse(line));
+    );
     const readRelation = (scope: "c" | "k") => {
       const relation = relationNodes.find(
         (candidate: { relation_id?: string; relation_type?: string }) =>
@@ -840,7 +861,11 @@ describe("field multi-hop lineage", () => {
         taskNodes: [
           {
             taskId: "100",
-            upstreamDecision: { primary: ["201", "202"], additional: [], unknown: [] },
+            upstreamDecision: {
+              primary: ["201", "202"],
+              additional: [],
+              unknown: [],
+            },
           },
           {
             taskId: "201",
@@ -856,14 +881,22 @@ describe("field multi-hop lineage", () => {
             consumerTaskId: "100",
             producerTaskId: "201",
             producerRole: "PRIMARY",
-            table: { platform: "hive", dataSource: "warehouse", qualifiedName: "demo.mid" },
+            table: {
+              platform: "hive",
+              dataSource: "warehouse",
+              qualifiedName: "demo.mid",
+            },
             readOccurrence: readRelation("c"),
           },
           {
             consumerTaskId: "100",
             producerTaskId: "202",
             producerRole: "PRIMARY",
-            table: { platform: "hive", dataSource: "warehouse", qualifiedName: "demo.mid" },
+            table: {
+              platform: "hive",
+              dataSource: "warehouse",
+              qualifiedName: "demo.mid",
+            },
             readOccurrence: readRelation("k"),
           },
         ],
@@ -962,7 +995,7 @@ describe("field multi-hop lineage", () => {
       taskIds: ["100", "201", "202"],
       outputRoot: f.factsRoot,
     });
-    const relationNodes = readFileSync(
+    const relationNodes = readJsonlRecords(
       join(
         f.factsRoot,
         "registry",
@@ -971,12 +1004,7 @@ describe("field multi-hop lineage", () => {
         "bundle",
         "relation-nodes.jsonl",
       ),
-      "utf8",
-    )
-      .trim()
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .map((line) => JSON.parse(line));
+    );
     const readRelation = (scope: "init" | "em") => {
       const relation = relationNodes.find(
         (candidate: { relation_id?: string; relation_type?: string }) =>
@@ -1000,7 +1028,11 @@ describe("field multi-hop lineage", () => {
         taskNodes: [
           {
             taskId: "100",
-            upstreamDecision: { primary: ["201", "202"], additional: [], unknown: [] },
+            upstreamDecision: {
+              primary: ["201", "202"],
+              additional: [],
+              unknown: [],
+            },
           },
           {
             taskId: "201",
@@ -1016,14 +1048,22 @@ describe("field multi-hop lineage", () => {
             consumerTaskId: "100",
             producerTaskId: "201",
             producerRole: "PRIMARY",
-            table: { platform: "hive", dataSource: "warehouse", qualifiedName: "demo.mid" },
+            table: {
+              platform: "hive",
+              dataSource: "warehouse",
+              qualifiedName: "demo.mid",
+            },
             readOccurrence: readRelation("init"),
           },
           {
             consumerTaskId: "100",
             producerTaskId: "202",
             producerRole: "PRIMARY",
-            table: { platform: "hive", dataSource: "warehouse", qualifiedName: "demo.mid" },
+            table: {
+              platform: "hive",
+              dataSource: "warehouse",
+              qualifiedName: "demo.mid",
+            },
             readOccurrence: readRelation("em"),
           },
         ],
@@ -1064,8 +1104,7 @@ describe("field multi-hop lineage", () => {
     expect(producerIdsForRoot("out_b")).not.toContain("201");
     expect(
       artifact.gaps.some(
-        (gap) =>
-          gap.reasonCode === "READ_OCCURRENCE_FIELD_BINDING_UNKNOWN",
+        (gap) => gap.reasonCode === "READ_OCCURRENCE_FIELD_BINDING_UNKNOWN",
       ),
     ).toBe(false);
   });
@@ -1547,18 +1586,22 @@ describe("field multi-hop lineage", () => {
       maxStates: 100,
       maxPaths: 100,
     });
-    expect(artifact.nodes.some(
-      (node) =>
-        node.field.identityStatus === "TASK_LOCAL_SCHEMA_BACKED" &&
-        node.field.qualifiedName === "demo.local_stage" &&
-        node.field.column === "stage_a",
-    )).toBe(true);
-    expect(artifact.nodes.some(
-      (node) =>
-        node.field.identityStatus === "SCHEMA_BACKED" &&
-        node.field.qualifiedName === "demo.extra" &&
-        node.field.column === "src_a",
-    )).toBe(true);
+    expect(
+      artifact.nodes.some(
+        (node) =>
+          node.field.identityStatus === "TASK_LOCAL_SCHEMA_BACKED" &&
+          node.field.qualifiedName === "demo.local_stage" &&
+          node.field.column === "stage_a",
+      ),
+    ).toBe(true);
+    expect(
+      artifact.nodes.some(
+        (node) =>
+          node.field.identityStatus === "SCHEMA_BACKED" &&
+          node.field.qualifiedName === "demo.extra" &&
+          node.field.column === "src_a",
+      ),
+    ).toBe(true);
     expect(artifact.candidates).toHaveLength(0);
     expect(artifact.gaps).toHaveLength(0);
     expect(artifact.edges.some((edge) => edge.producerTaskId === "1200")).toBe(
@@ -1568,7 +1611,9 @@ describe("field multi-hop lineage", () => {
   });
 
   it("bridges a bare-name Task-local materialization and keeps it attached to its preceding write", () => {
-    const parent = mkdtempSync(join(tmpdir(), "field-lineage-task-local-schema-"));
+    const parent = mkdtempSync(
+      join(tmpdir(), "field-lineage-task-local-schema-"),
+    );
     const dataRoot = join(parent, "data");
     const factsRoot = join(parent, "facts");
     for (const table of [
@@ -1620,7 +1665,8 @@ describe("field multi-hop lineage", () => {
       partition: null,
       sql: {
         query: {
-          content: "INSERT OVERWRITE TABLE pdata_n.source SELECT raw_a AS src_a FROM pdata_n.raw;",
+          content:
+            "INSERT OVERWRITE TABLE pdata_n.source SELECT raw_a AS src_a FROM pdata_n.raw;",
           evidenceProvider: "synthetic:test",
         },
       },
@@ -1682,7 +1728,8 @@ describe("field multi-hop lineage", () => {
         (node) =>
           node.field.qualifiedName === "otc_div_temp" &&
           node.field.column === "allo_prop_3" &&
-          node.bindingId === "output-binding:100:task:100:slot:query:statement:0:0" &&
+          node.bindingId ===
+            "output-binding:100:task:100:slot:query:statement:0:0" &&
           node.expressionText?.includes("s.src_a AS allo_prop_3"),
       ),
     ).toBe(true);
@@ -1690,11 +1737,15 @@ describe("field multi-hop lineage", () => {
       artifact.edges.some(
         (edge) =>
           edge.mapping === "src_a -> allo_prop_3" &&
-          edge.toNodeId.includes("output-binding:100:task:100:slot:query:statement:0:0"),
+          edge.toNodeId.includes(
+            "output-binding:100:task:100:slot:query:statement:0:0",
+          ),
       ),
     ).toBe(true);
     expect(artifact.nodes.some((node) => node.taskId === "200")).toBe(true);
-    expect(artifact.edges.some((edge) => edge.producerTaskId === "200")).toBe(true);
+    expect(artifact.edges.some((edge) => edge.producerTaskId === "200")).toBe(
+      true,
+    );
     expect(validateFieldLineageArtifact(artifact)).toEqual([]);
   });
 
@@ -1766,7 +1817,11 @@ describe("field multi-hop lineage", () => {
         taskNodes: [
           {
             taskId: "1200",
-            upstreamDecision: { primary: ["1300"], additional: [], unknown: [] },
+            upstreamDecision: {
+              primary: ["1300"],
+              additional: [],
+              unknown: [],
+            },
           },
           {
             taskId: "1300",
@@ -1814,7 +1869,9 @@ describe("field multi-hop lineage", () => {
         .map((node) => node.taskId),
     );
     const localBridgeEdges = artifact.edges.filter((edge) => {
-      const from = artifact.nodes.find((node) => node.nodeId === edge.fromNodeId);
+      const from = artifact.nodes.find(
+        (node) => node.nodeId === edge.fromNodeId,
+      );
       const to = artifact.nodes.find((node) => node.nodeId === edge.toNodeId);
       return (
         from?.taskId === "1200" &&
@@ -1830,14 +1887,15 @@ describe("field multi-hop lineage", () => {
     expect(localBridgeEdges).toHaveLength(1);
     expect(localBridgeEdges[0]!.fromNodeId).toMatch(/^field-node:/);
     expect(localBridgeEdges[0]!.toNodeId).toMatch(/^field-source-node:/);
-    expect(
-      new Set(artifact.edges.map((edge) => edge.edgeId)).size,
-    ).toBe(artifact.edges.length);
+    expect(new Set(artifact.edges.map((edge) => edge.edgeId)).size).toBe(
+      artifact.edges.length,
+    );
     expect(artifact.nodes.some((node) => node.taskId === "1300")).toBe(true);
     expect(reachableTasks).toContain("1300");
     expect(
       artifact.edges.some(
-        (edge) => edge.producerTaskId === "1300" && reachable.has(edge.toNodeId),
+        (edge) =>
+          edge.producerTaskId === "1300" && reachable.has(edge.toNodeId),
       ),
     ).toBe(true);
     expect(validateFieldLineageArtifact(artifact)).toEqual([]);
@@ -2003,7 +2061,9 @@ describe("field multi-hop lineage", () => {
         maxStates: 100,
         maxPaths: 100,
       }),
-    ).toThrow(/ROOT_WRITE_OBSERVATION_REQUIRED|ROOT_WRITE_OBSERVATION_NOT_FOUND/);
+    ).toThrow(
+      /ROOT_WRITE_OBSERVATION_REQUIRED|ROOT_WRITE_OBSERVATION_NOT_FOUND/,
+    );
   });
 
   it("keeps zipper LEFT refs off internal_trade_id VALUE_FLOW and on 105387 JOIN controls", () => {
@@ -2017,13 +2077,25 @@ describe("field multi-hop lineage", () => {
       "demo.d_ref_trs",
     ];
     for (const table of [
-      { qualifiedName: "demo.audit_log", columns: "internal_trade_id STRING, entity_id STRING" },
-      { qualifiedName: "demo.stati", columns: "internal_trade_id STRING, stati_cont_desc STRING" },
+      {
+        qualifiedName: "demo.audit_log",
+        columns: "internal_trade_id STRING, entity_id STRING",
+      },
+      {
+        qualifiedName: "demo.stati",
+        columns: "internal_trade_id STRING, stati_cont_desc STRING",
+      },
       { qualifiedName: "demo.audit", columns: "entity_id STRING" },
       { qualifiedName: "demo.audit_src", columns: "entity_id STRING" },
       { qualifiedName: "demo.raw_audit", columns: "entity_id STRING" },
-      { qualifiedName: "demo.trades", columns: "internal_trade_id STRING, k STRING, v STRING" },
-      { qualifiedName: "demo.raw_trades", columns: "internal_trade_id STRING, k STRING, v STRING" },
+      {
+        qualifiedName: "demo.trades",
+        columns: "internal_trade_id STRING, k STRING, v STRING",
+      },
+      {
+        qualifiedName: "demo.raw_trades",
+        columns: "internal_trade_id STRING, k STRING, v STRING",
+      },
       ...zipperTables.map((qualifiedName) => ({
         qualifiedName,
         columns: "k STRING, v STRING",
@@ -2094,7 +2166,8 @@ describe("field multi-hop lineage", () => {
       partition: null,
       sql: {
         query: {
-          content: "INSERT OVERWRITE TABLE demo.audit SELECT src.entity_id AS entity_id FROM demo.audit_src src",
+          content:
+            "INSERT OVERWRITE TABLE demo.audit SELECT src.entity_id AS entity_id FROM demo.audit_src src",
           evidenceProvider: "synthetic:test",
         },
       },
@@ -2114,7 +2187,8 @@ describe("field multi-hop lineage", () => {
       partition: null,
       sql: {
         query: {
-          content: "INSERT OVERWRITE TABLE demo.audit_src SELECT src.entity_id AS entity_id FROM demo.raw_audit src",
+          content:
+            "INSERT OVERWRITE TABLE demo.audit_src SELECT src.entity_id AS entity_id FROM demo.raw_audit src",
           evidenceProvider: "synthetic:test",
         },
       },
@@ -2157,15 +2231,27 @@ describe("field multi-hop lineage", () => {
         taskNodes: [
           {
             taskId: "155015",
-            upstreamDecision: { primary: ["114026", "105387"], additional: [], unknown: [] },
+            upstreamDecision: {
+              primary: ["114026", "105387"],
+              additional: [],
+              unknown: [],
+            },
           },
           {
             taskId: "114026",
-            upstreamDecision: { primary: ["112715"], additional: [], unknown: [] },
+            upstreamDecision: {
+              primary: ["112715"],
+              additional: [],
+              unknown: [],
+            },
           },
           {
             taskId: "105387",
-            upstreamDecision: { primary: ["71698"], additional: [], unknown: [] },
+            upstreamDecision: {
+              primary: ["71698"],
+              additional: [],
+              unknown: [],
+            },
           },
           {
             taskId: "112715",
@@ -2208,10 +2294,15 @@ describe("field multi-hop lineage", () => {
       maxPaths: 100,
     });
     const zipperName = (qualifiedName: string): boolean =>
-      zipperTables.some((table) => qualifiedName.includes(table.split(".").at(-1)!));
+      zipperTables.some((table) =>
+        qualifiedName.includes(table.split(".").at(-1)!),
+      );
     const walkTasks = (rootColumn: string): string[] => {
       const pending = artifact.nodes
-        .filter((node) => node.taskId === "155015" && node.field.column === rootColumn)
+        .filter(
+          (node) =>
+            node.taskId === "155015" && node.field.column === rootColumn,
+        )
         .map((node) => node.nodeId);
       const seen = new Set<string>();
       const tasks = new Set<string>();
@@ -2220,12 +2311,16 @@ describe("field multi-hop lineage", () => {
         const nodeId = pending.pop()!;
         if (seen.has(nodeId)) continue;
         seen.add(nodeId);
-        const node = artifact.nodes.find((candidate) => candidate.nodeId === nodeId);
+        const node = artifact.nodes.find(
+          (candidate) => candidate.nodeId === nodeId,
+        );
         if (node) {
           tasks.add(node.taskId);
           tables.add(node.field.qualifiedName);
         }
-        for (const edge of artifact.edges.filter((candidate) => candidate.toNodeId === nodeId))
+        for (const edge of artifact.edges.filter(
+          (candidate) => candidate.toNodeId === nodeId,
+        ))
           pending.push(edge.fromNodeId);
       }
       return [...tasks].sort();
@@ -2237,7 +2332,11 @@ describe("field multi-hop lineage", () => {
           const seen = new Set<string>();
           const roots = new Set(
             artifact.nodes
-              .filter((candidate) => candidate.taskId === "155015" && candidate.field.column === "internal_trade_id")
+              .filter(
+                (candidate) =>
+                  candidate.taskId === "155015" &&
+                  candidate.field.column === "internal_trade_id",
+              )
               .map((candidate) => candidate.nodeId),
           );
           while (pending.length > 0) {
@@ -2245,7 +2344,9 @@ describe("field multi-hop lineage", () => {
             if (seen.has(nodeId)) continue;
             seen.add(nodeId);
             if (roots.has(nodeId)) return true;
-            for (const edge of artifact.edges.filter((candidate) => candidate.fromNodeId === nodeId))
+            for (const edge of artifact.edges.filter(
+              (candidate) => candidate.fromNodeId === nodeId,
+            ))
               pending.push(edge.toNodeId);
           }
           return false;
@@ -2254,7 +2355,9 @@ describe("field multi-hop lineage", () => {
     );
     expect([...tradeTables].some(zipperName)).toBe(false);
     expect(
-      artifact.fieldConditionals.some((item) => item.fields.some((field) => zipperName(field.qualifiedName))),
+      artifact.fieldConditionals.some((item) =>
+        item.fields.some((field) => zipperName(field.qualifiedName)),
+      ),
     ).toBe(false);
     const joinControls = artifact.datasetControls.filter(
       (control) =>
@@ -2263,25 +2366,44 @@ describe("field multi-hop lineage", () => {
         control.field !== null &&
         zipperName(control.field.qualifiedName),
     );
-    expect(new Set(joinControls.map((control) => control.field!.qualifiedName.split(".").at(-1))).size).toBe(4);
-    expect(joinControls.every((control) => control.grain === "EXPAND_RISK" || control.grain === "UNKNOWN")).toBe(
+    expect(
+      new Set(
+        joinControls.map((control) =>
+          control.field!.qualifiedName.split(".").at(-1),
+        ),
+      ).size,
+    ).toBe(4);
+    expect(
+      joinControls.every(
+        (control) =>
+          control.grain === "EXPAND_RISK" || control.grain === "UNKNOWN",
+      ),
+    ).toBe(true);
+    expect(joinControls.every((control) => control.grain !== "PRESERVE")).toBe(
       true,
     );
-    expect(joinControls.every((control) => control.grain !== "PRESERVE")).toBe(true);
     expect(
-      joinControls.every((control) => control.grainReason === "GRAIN_JOIN_NULLABLE_SIDE_MAY_EXPAND"),
+      joinControls.every(
+        (control) =>
+          control.grainReason === "GRAIN_JOIN_NULLABLE_SIDE_MAY_EXPAND",
+      ),
     ).toBe(true);
     expect(
       artifact.datasetControls.every(
         (control) =>
           control.grain === "PRESERVE" ||
-          (typeof control.grainReason === "string" && control.grainReason.length > 0),
+          (typeof control.grainReason === "string" &&
+            control.grainReason.length > 0),
       ),
     ).toBe(true);
     const tradeTasks = walkTasks("internal_trade_id");
     const auditTasks = walkTasks("entity_id");
-    expect(tradeTasks).toEqual(expect.arrayContaining(["71698", "105387", "155015"]));
-    expect(auditTasks).toEqual(expect.arrayContaining(["112715", "114026", "155015"]));
+    expect(tradeTasks).toEqual(
+      expect.arrayContaining(["71698", "105387", "155015"]),
+    );
+    expect(auditTasks).toEqual(
+      expect.arrayContaining(["112715", "114026", "155015"]),
+    );
     expect(validateFieldLineageArtifact(artifact)).toEqual([]);
   });
 
@@ -2352,7 +2474,9 @@ describe("field multi-hop lineage", () => {
       maxStates: 100,
       maxPaths: 100,
     });
-    const joinControls = artifact.datasetControls.filter((control) => control.subtype === "JOIN");
+    const joinControls = artifact.datasetControls.filter(
+      (control) => control.subtype === "JOIN",
+    );
     const innerReasons = new Set(
       joinControls
         .filter((control) => control.field?.qualifiedName === "demo.inner_side")
@@ -2372,12 +2496,15 @@ describe("field multi-hop lineage", () => {
         .filter((control) => control.field?.qualifiedName === "demo.inner_side")
         .every((control) => control.grain === "EXPAND_RISK"),
     ).toBe(true);
-    expect(joinControls.every((control) => control.grain !== "UNKNOWN")).toBe(true);
+    expect(joinControls.every((control) => control.grain !== "UNKNOWN")).toBe(
+      true,
+    );
     expect(
       artifact.datasetControls.every(
         (control) =>
           control.grain === "PRESERVE" ||
-          (typeof control.grainReason === "string" && control.grainReason.length > 0),
+          (typeof control.grainReason === "string" &&
+            control.grainReason.length > 0),
       ),
     ).toBe(true);
     expect(validateFieldLineageArtifact(artifact)).toEqual([]);

@@ -1,14 +1,12 @@
-import { readFileSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { runInputPackMachineFacts } from "../scripts/machine-facts/input-pack-machine-facts.ts";
 import { reconcileFieldLineage } from "../scripts/reconcile/consumer/field-lineage/field-lineage.ts";
 import { formatFieldLineageSummary } from "../scripts/reconcile/consumer/field-lineage/format-field-lineage.ts";
-import { visualizeFieldLineage } from "../scripts/visualize/field-lineage-visualize.ts";
 import {
   createDefaultHiveSchemaFixture,
   createSelfJoinFixture,
@@ -17,13 +15,10 @@ import {
   valueAndRowsetTableLineage,
 } from "./fixtures/field-lineage/baseline/metadata.ts";
 
-const BASELINE_ROOT = resolve("tests/fixtures/field-lineage/baseline");
-
-function json<T>(name: string): T {
-  return JSON.parse(readFileSync(join(BASELINE_ROOT, name), "utf8")) as T;
-}
-
-function roots(name: string): { readonly dataRoot: string; readonly factsRoot: string } {
+function roots(name: string): {
+  readonly dataRoot: string;
+  readonly factsRoot: string;
+} {
   const parent = mkdtempSync(join(tmpdir(), `field-lineage-baseline-${name}-`));
   return { dataRoot: join(parent, "data"), factsRoot: join(parent, "facts") };
 }
@@ -52,10 +47,18 @@ describe("field-lineage 1.2 baseline", () => {
     });
 
     expect(artifact.overallStatus).toBe("PARTIAL");
-    expect(artifact.edges.every((edge) => edge.kind === "VALUE_FLOW")).toBe(true);
-    expect(artifact.edges.some((edge) => edge.producerTaskId === "200")).toBe(true);
-    expect(artifact.edges.some((edge) => edge.producerTaskId === "300")).toBe(true);
-    expect(artifact.edges.some((edge) => edge.producerTaskId === "400")).toBe(false);
+    expect(artifact.edges.every((edge) => edge.kind === "VALUE_FLOW")).toBe(
+      true,
+    );
+    expect(artifact.edges.some((edge) => edge.producerTaskId === "200")).toBe(
+      true,
+    );
+    expect(artifact.edges.some((edge) => edge.producerTaskId === "300")).toBe(
+      true,
+    );
+    expect(artifact.edges.some((edge) => edge.producerTaskId === "400")).toBe(
+      false,
+    );
     expect(
       artifact.candidates.some(
         (candidate) => candidate.producerTaskId === "400",
@@ -68,7 +71,8 @@ describe("field-lineage 1.2 baseline", () => {
       artifact.datasetControls.every(
         (control) =>
           control.grain === "PRESERVE" ||
-          (typeof control.grainReason === "string" && control.grainReason.length > 0),
+          (typeof control.grainReason === "string" &&
+            control.grainReason.length > 0),
       ),
     ).toBe(true);
     expect(
@@ -254,7 +258,8 @@ describe("field-lineage 1.2 baseline", () => {
       artifact.datasetControls.every(
         (control) =>
           control.grain === "PRESERVE" ||
-          (typeof control.grainReason === "string" && control.grainReason.length > 0),
+          (typeof control.grainReason === "string" &&
+            control.grainReason.length > 0),
       ),
     ).toBe(true);
     expect(
@@ -263,56 +268,4 @@ describe("field-lineage 1.2 baseline", () => {
       ),
     ).toBe(false);
   });
-
-  it("keeps the legacy field artifact readable by the HTML consumer", () => {
-    const fixture = roots("legacy");
-    const artifactPath = join(BASELINE_ROOT, "legacy-field-lineage.json");
-    const outputPath = join(fixture.dataRoot, "legacy-field-lineage.html");
-
-    expect(() =>
-      visualizeFieldLineage({ artifactPath, outputPath }),
-    ).not.toThrow();
-    const html = readFileSync(outputPath, "utf8");
-    expect(html).toContain("Field lineage legacy-root");
-    expect(html).toContain("legacy-source");
-    expect(html).toContain("legacy-root");
-    expect(html).toContain("demo.source");
-  });
-
-  it("records the 209119 immutable-input reuse contract without claiming field-only support", () => {
-    const fixture = json<{
-      readonly taskId: string;
-      readonly sourceArtifactPolicy: string;
-      readonly expected: {
-        readonly reusedLayers: readonly string[];
-        readonly recomputedLayers: readonly string[];
-        readonly fullTaskCollection: boolean;
-        readonly fullProducerIndexRebuild: boolean;
-      };
-      readonly fieldOnlyCliStatus: string;
-      readonly blocker: string;
-    }>("209119-field-only.json");
-
-    expect(fixture.taskId).toBe("209119");
-    expect(fixture.sourceArtifactPolicy).toBe("reuse-only");
-    expect(fixture.expected.reusedLayers).toEqual([
-      "input-pack",
-      "machine-facts",
-      "producer-index",
-      "table-multi-hop-artifact",
-    ]);
-    expect(fixture.expected.recomputedLayers).toEqual([
-      "field-lineage",
-      "summary",
-      "html",
-    ]);
-    expect(fixture.expected.fullTaskCollection).toBe(false);
-    expect(fixture.expected.fullProducerIndexRebuild).toBe(false);
-    expect(fixture.fieldOnlyCliStatus).toBe("PENDING");
-    expect(fixture.blocker).toContain("no field-only CLI");
-  });
-
-  it.todo(
-    "PENDING: add a field-only CLI contract test for Task 209119 once that CLI exists",
-  );
 });

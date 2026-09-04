@@ -15,11 +15,16 @@
   "scripts": {
     "prepare:deps": "node scripts/ensure-dependencies.mjs",
     "prebuild": "npm run prepare:deps",
-    "build": "node --input-type=module -e \"import { SqlSession, Schema } from 'sqllens'; if (!SqlSession || !Schema) throw new Error('sqllens engine missing'); console.log('build: sqllens engine ready');\"",
+    "build": "tsc -p tsconfig.build.json",
     "pretypecheck": "npm run prepare:deps",
     "typecheck": "tsc -p tsconfig.json",
     "pretest": "npm run prepare:deps",
-    "test": "vitest run tests/lineage-scope.test.ts tests/machine-facts.test.ts tests/machine-facts/jsonl-store.test.ts tests/input-pack-machine-facts.test.ts tests/field-lineage.test.ts tests/field-lineage-baseline.test.ts tests/physical-field-resolver.test.ts tests/physical-field-expander.test.ts tests/semantic-dependency-contract.test.ts tests/operator-support-matrix.test.ts tests/semantic-dependency-normalizer.test.ts tests/plan-adapter-regression.test.ts tests/read-occurrence-resolver.test.ts tests/task-inspection.test.ts tests/input-pack.test.ts tests/sql-table-references.test.ts tests/repair-stored-input-packs.test.ts tests/rebuild-task-partition-evidence.test.ts tests/reconcile-one-hop.test.ts tests/producer-index.test.ts tests/producer-index-query.test.ts tests/reconcile-multi-hop.test.ts tests/reconcile-multi-hop-autofill.test.ts tests/task-partition-evidence.test.ts tests/visualize-multi-hop.test.ts tests/collect-one-task-input-pack-sparkindex.test.ts tests/schedule-detail-cache.test.ts tests/fill-hive-task-sql-cache.test.ts tests/fill-run-script-sql-cache.test.ts tests/jsonl-offset-index.test.ts tests/offline-table-resolver.test.ts tests/cache-task-evidence.test.ts tests/collect-input-pack-from-cache.test.ts tests/hive-ddl-from-log-cache.test.ts tests/inventory-input-pack-partials.test.ts tests/repair-input-pack-partials.test.ts",
+    "test": "npm run test:contracts && npm run test:stage-baseline && npm run test:data-graph-baseline && npm run test:field-lineage -- --no-file-parallelism && npm run test:retained-lineage && npm run test:retained-input",
+    "test:contracts": "vitest run tests/contracts/identity-contract.test.ts",
+    "test:stage-baseline": "vitest run tests/baseline/current-stage-baseline.test.ts",
+    "test:data-graph-baseline": "vitest run tests/baseline/data-graph-behavior-fixtures.test.ts",
+    "test:retained-lineage": "vitest run tests/lineage-scope.test.ts tests/machine-facts.test.ts tests/machine-facts/jsonl-store.test.ts tests/machine-facts/relation-identity.test.ts tests/machine-facts/read-occurrence-proof.test.ts tests/plan-adapter-regression.test.ts tests/read-occurrence-resolver.test.ts tests/task-inspection.test.ts tests/reconcile-one-hop.test.ts tests/producer-index.test.ts tests/producer-index-query.test.ts tests/reconcile-multi-hop.test.ts tests/reconcile-multi-hop-autofill.test.ts tests/task-partition-evidence.test.ts tests/visualize-multi-hop.test.ts --no-file-parallelism",
+    "test:retained-input": "vitest run tests/input-pack.test.ts tests/sql-table-references.test.ts tests/repair-stored-input-packs.test.ts tests/rebuild-task-partition-evidence.test.ts tests/collect-one-task-input-pack-sparkindex.test.ts tests/schedule-detail-cache.test.ts tests/fill-hive-task-sql-cache.test.ts tests/fill-run-script-sql-cache.test.ts tests/jsonl-offset-index.test.ts tests/offline-table-resolver.test.ts tests/cache-task-evidence.test.ts tests/collect-input-pack-from-cache.test.ts tests/hive-ddl-from-log-cache.test.ts tests/inventory-input-pack-partials.test.ts tests/repair-input-pack-partials.test.ts tests/repair-manifest-contract.test.ts --no-file-parallelism",
     "test:input-pack:from-cache": "vitest run tests/jsonl-offset-index.test.ts tests/offline-table-resolver.test.ts tests/cache-task-evidence.test.ts tests/collect-input-pack-from-cache.test.ts tests/hive-ddl-from-log-cache.test.ts tests/inventory-input-pack-partials.test.ts tests/repair-input-pack-partials.test.ts",
     "test:input-pack:cache-fill": "vitest run tests/fill-hive-task-sql-cache.test.ts tests/fill-run-script-sql-cache.test.ts",
     "test:input-pack:offline": "vitest run tests/offline-table-resolver.test.ts",
@@ -126,7 +131,7 @@
     "preinspect": "npm run prepare:deps",
     "inspect": "tsx scripts/query/task-inspection.ts",
     "preformat:check": "npm run prepare:deps",
-    "format:check": "prettier --check package.json README.md docs tests/gold"
+    "format:check": "prettier --check --no-error-on-unmatched-pattern package.json tsconfig.json tsconfig.build.json vitest.config.ts \"src/**/*.ts\" scripts/input/mainline/diff-input-pack-from-cache.ts scripts/input/mainline/fill-missing-task-input-packs.ts scripts/input/mainline/heal-rdbms-core-duplicates-from-snapshot.ts scripts/input/repair/repair-missing-table-packs.ts \"tests/contracts/**/*.ts\" \"tests/baseline/**/*.ts\" \"tests/fixtures/current-stage-baseline/**/*.ts\" \"tests/fixtures/data-graph-baseline/**/*.{ts,md}\" tests/field-lineage.test.ts tests/field-lineage-baseline.test.ts tests/reconcile-one-hop.test.ts tests/producer-index.test.ts tests/reconcile-multi-hop.test.ts tests/fixtures/field-lineage/cases.ts tests/fixtures/field-lineage/baseline/metadata.ts tests/repair-manifest-contract.test.ts"
   },
   "license": "MIT",
   "type": "module",

@@ -1,11 +1,4 @@
-import {
-  cpSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -30,60 +23,8 @@ import {
 } from "../scripts/reconcile/producer/producer-index.ts";
 import { scheduleEvidenceCachePath } from "../scripts/reconcile/consumer/one-hop/schedule-evidence-cache.ts";
 
-const frozen86840It = existsSync(
-  join(
-    import.meta.dirname,
-    "fixtures",
-    "reconcile-one-hop",
-    "86840-input-pack",
-  ),
-)
-  ? it
-  : it.skip;
-
 function fixtureRoot(): string {
   return mkdtempSync(join(tmpdir(), "sql-lineage-one-hop-"));
-}
-
-function materializeFrozenInputPack(sourceRoot: string): string {
-  const dataRoot = fixtureRoot();
-  cpSync(sourceRoot, dataRoot, { recursive: true });
-  const visit = (directory: string): void => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const absolutePath = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        visit(absolutePath);
-        continue;
-      }
-      const normalizeEvidenceFile = (relativePath: string): void => {
-        const evidencePath = join(directory, relativePath);
-        const normalized = readFileSync(evidencePath, "utf8").replaceAll(
-          "\r\n",
-          "\n",
-        );
-        writeFileSync(
-          evidencePath,
-          normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized,
-        );
-      };
-      if (entry.name === "task.json") {
-        const task = JSON.parse(readFileSync(absolutePath, "utf8")) as {
-          sqlFiles?: { path: string }[];
-        };
-        for (const sqlFile of task.sqlFiles ?? []) {
-          normalizeEvidenceFile(sqlFile.path);
-        }
-      }
-      if (entry.name === "table.json") {
-        const table = JSON.parse(readFileSync(absolutePath, "utf8")) as {
-          ddlFile?: { path: string };
-        };
-        if (table.ddlFile) normalizeEvidenceFile(table.ddlFile.path);
-      }
-    }
-  };
-  visit(dataRoot);
-  return dataRoot;
 }
 
 function writeTable(
@@ -230,16 +171,46 @@ describe("reconcileOneHop", () => {
     const fixture = writeProducerIndexFixture();
     let calls = 0;
     const evidence = new Map([
-      ["current-indexed", { rows: [{ task_id: "parent-a" }], provider: "opencli:horae.relation", locator: "test:a", observedAt: "2026-08-27T00:00:01.000Z" }],
+      [
+        "current-indexed",
+        {
+          rows: [{ task_id: "parent-a" }],
+          provider: "opencli:horae.relation",
+          locator: "test:a",
+          observedAt: "2026-08-27T00:00:01.000Z",
+        },
+      ],
     ]);
-    const result = reconcileOneHop("current-indexed", { dataRoot: fixture.dataRoot, producerIndex: fixture.producerIndex, scheduleEvidenceByTaskId: evidence, openCliRunner: () => { calls += 1; return []; } });
+    const result = reconcileOneHop("current-indexed", {
+      dataRoot: fixture.dataRoot,
+      producerIndex: fixture.producerIndex,
+      scheduleEvidenceByTaskId: evidence,
+      openCliRunner: () => {
+        calls += 1;
+        return [];
+      },
+    });
     expect(result.schedule.parents[0]?.taskId).toBe("parent-a");
-    expect(result.schedule.evidence[0]?.provider).toBe("opencli:horae.relation");
+    expect(result.schedule.evidence[0]?.provider).toBe(
+      "opencli:horae.relation",
+    );
     expect(result.schedule.evidence[0]?.locator).toBe("test:a");
-    expect(result.schedule.evidence[0]?.observedAt).toBe("2026-08-27T00:00:01.000Z");
+    expect(result.schedule.evidence[0]?.observedAt).toBe(
+      "2026-08-27T00:00:01.000Z",
+    );
     expect(calls).toBe(0);
     evidence.delete("current-indexed");
-    expect(() => reconcileOneHop("current-indexed", { dataRoot: fixture.dataRoot, producerIndex: fixture.producerIndex, scheduleEvidenceByTaskId: evidence, openCliRunner: () => { calls += 1; return []; } })).toThrow("SCHEDULE_EVIDENCE_MISSING");
+    expect(() =>
+      reconcileOneHop("current-indexed", {
+        dataRoot: fixture.dataRoot,
+        producerIndex: fixture.producerIndex,
+        scheduleEvidenceByTaskId: evidence,
+        openCliRunner: () => {
+          calls += 1;
+          return [];
+        },
+      }),
+    ).toThrow("SCHEDULE_EVIDENCE_MISSING");
     expect(calls).toBe(0);
   });
 
@@ -314,7 +285,8 @@ describe("reconcileOneHop", () => {
     writeTask(dataRoot, "current", {
       sql: {
         query: {
-          content: "INSERT OVERWRITE TABLE mart.current SELECT id FROM pdata_n.ref_cd_cvt_map",
+          content:
+            "INSERT OVERWRITE TABLE mart.current SELECT id FROM pdata_n.ref_cd_cvt_map",
           evidenceProvider: "fixture:sql",
         },
       },
@@ -329,7 +301,8 @@ describe("reconcileOneHop", () => {
     writeTask(dataRoot, "map-producer", {
       sql: {
         query: {
-          content: "INSERT OVERWRITE TABLE pdata_n.ref_cd_cvt_map SELECT id FROM raw.seed",
+          content:
+            "INSERT OVERWRITE TABLE pdata_n.ref_cd_cvt_map SELECT id FROM raw.seed",
           evidenceProvider: "fixture:sql",
         },
       },
@@ -363,9 +336,9 @@ describe("reconcileOneHop", () => {
       terminalTableConfig,
     });
 
-    expect(result.currentTask.directReads.map((read) => read.table.qualifiedName)).toContain(
-      "pdata_n.ref_cd_cvt_map",
-    );
+    expect(
+      result.currentTask.directReads.map((read) => read.table.qualifiedName),
+    ).toContain("pdata_n.ref_cd_cvt_map");
     expect(result.dataPath.confirmedProducers).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -634,10 +607,9 @@ describe("reconcileOneHop", () => {
       )?.partitionMatch.status,
     ).toBe("PROVEN_DISJOINT");
     const summary = summarizeOneHop(result);
-    expect(summary.confirmedProducers.map((producer) => producer.taskId)).toEqual([
-      "producer-partitioned",
-      "producer-partitioned-2",
-    ]);
+    expect(
+      summary.confirmedProducers.map((producer) => producer.taskId),
+    ).toEqual(["producer-partitioned", "producer-partitioned-2"]);
     expect(summary.confirmedProducers[0]?.partitionMatch.status).toBe(
       "PROVEN_OVERLAP",
     );
@@ -897,7 +869,9 @@ JOIN (SELECT id FROM src.shared_history WHERE src_tbl = 'BOOK') k
     const sourceRead = result.currentTask.directReads.find(
       (read) => read.table.qualifiedName === "src.partitioned",
     );
-    expect(sourceRead?.readPartitionScopes[0]?.scope.status).toBe("CONSTRAINED");
+    expect(sourceRead?.readPartitionScopes[0]?.scope.status).toBe(
+      "CONSTRAINED",
+    );
     expect(sourceRead?.readPartitionScopes[0]?.scope.reasonCodes).toContain(
       "READ_OCCURRENCE_CROSS_TABLE_PREDICATE_NOT_PUSHDOWN",
     );
@@ -1478,146 +1452,4 @@ JOIN (SELECT id FROM src.shared_history WHERE src_tbl = 'BOOK') k
     expect(result.nextDataTaskIds).toEqual([]);
     expect(calls).toHaveLength(1);
   });
-
-  frozen86840It(
-    "replays the frozen real 86840 Input Pack through 22 local and 4 supplemental parents",
-    () => {
-      const fixture = JSON.parse(
-        readFileSync(
-          join(
-            process.cwd(),
-            "tests",
-            "fixtures",
-            "reconcile-one-hop",
-            "86840-evidence.json",
-          ),
-          "utf8",
-        ),
-      ) as {
-        taskId: string;
-        frozenFrom: {
-          currentTaskContentHash: string;
-          querySha256: string;
-        };
-        expected: {
-          sqlDirectReads: number;
-          scheduleParents: number;
-          matched: number;
-          sqlOnly: number;
-          scheduleOnly: number;
-          unresolved: number;
-          sqlOnlyQualifiedName: string;
-        };
-        horaeRows: Record<string, unknown>[];
-        supplementalResponses: Record<string, Record<string, unknown>>;
-      };
-      const frozenInputPackRoot = join(
-        process.cwd(),
-        "tests",
-        "fixtures",
-        "reconcile-one-hop",
-        "86840-input-pack",
-      );
-      const dataRoot = materializeFrozenInputPack(frozenInputPackRoot);
-      const currentTask = JSON.parse(
-        readFileSync(
-          join(dataRoot, "tasks", "hiveTask-2.0", "86840", "task.json"),
-          "utf8",
-        ),
-      ) as {
-        contentHash: string;
-        sqlFiles: { slot: string; sha256: string }[];
-      };
-      expect(currentTask.contentHash).toBe(
-        fixture.frozenFrom.currentTaskContentHash,
-      );
-      expect(
-        currentTask.sqlFiles.find((file) => file.slot === "query")?.sha256,
-      ).toBe(fixture.frozenFrom.querySha256);
-      const runner: OpenCliRunner = (args) => {
-        if (args[0] === "horae") return fixture.horaeRows;
-        const parentTaskId = args[args.indexOf("--task-id") + 1]!;
-        const response = fixture.supplementalResponses[parentTaskId];
-        if (!response)
-          throw new Error(`UNEXPECTED_TASK_SOURCE:${parentTaskId}`);
-        return response;
-      };
-
-      const result = reconcileOneHop(fixture.taskId, {
-        dataRoot,
-        openCliRunner: runner,
-        now: () => "2026-08-22T02:58:38.275Z",
-      });
-
-      const { sqlOnlyQualifiedName, ...expectedCounts } = fixture.expected;
-      expect(result.counts).toEqual(expectedCounts);
-      expect(
-        result.reconciliation.filter((item) => item.status === "SQL_ONLY"),
-      ).toEqual([
-        expect.objectContaining({
-          taskId: null,
-          table: expect.objectContaining({
-            qualifiedName: sqlOnlyQualifiedName,
-          }),
-        }),
-      ]);
-      expect(result.nextScheduleTaskIds).toHaveLength(
-        fixture.expected.scheduleParents,
-      );
-      expect(result.nextDataTaskIds).toHaveLength(fixture.expected.matched);
-      expect(result.currentTask.directReads[0]?.evidence).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            source: "INPUT_PACK_SQL",
-            provider: "sql-mcp",
-          }),
-        ]),
-      );
-      expect(
-        result.parents.find((parent) => parent.taskId === "102845")
-          ?.confirmedWrites[0]?.evidence,
-      ).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            source: "INPUT_PACK_TASK",
-            provider: expect.stringContaining("opencli:szdata.task-source"),
-          }),
-        ]),
-      );
-
-      const producerIndex = buildTableProducerIndex(dataRoot, {
-        now: () => "2026-08-22T02:58:38.275Z",
-      });
-      expect(producerIndex.buildStatus).toBe("SUCCESS");
-      const indexedCalls: string[][] = [];
-      const indexedResult = reconcileOneHop(fixture.taskId, {
-        dataRoot,
-        producerIndex,
-        openCliRunner: (args) => {
-          indexedCalls.push([...args]);
-          if (args[0] === "horae") return fixture.horaeRows;
-          throw new Error(`INDEX_MODE_MUST_NOT_CALL:${args.join(" ")}`);
-        },
-        now: () => "2026-08-22T02:58:38.275Z",
-      });
-      expect(indexedResult.counts).toEqual({
-        sqlDirectReads: 27,
-        scheduleParents: 26,
-        matched: 22,
-        sqlOnly: 5,
-        scheduleOnly: 0,
-        unresolved: 4,
-      });
-      expect(indexedResult.producerIndex.status).toBe("VALID_SUCCESS");
-      expect(indexedResult.dataPath.confirmedProducers).toHaveLength(22);
-      expect(indexedResult.nextDataTaskIds).toHaveLength(22);
-      expect(indexedResult.coverage.retrieval).toEqual({
-        producerIndex: "VALID_SUCCESS",
-        liveTaskSourceAttempts: 0,
-        liveTaskSourceSuccesses: 0,
-        liveTaskSourceFailures: 0,
-      });
-      expect(indexedCalls).toHaveLength(1);
-    },
-  );
 });

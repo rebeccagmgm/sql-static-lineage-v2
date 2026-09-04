@@ -1,10 +1,19 @@
 {
-	"extends": "./tsconfig.json",
-	"compilerOptions": {
-		"module": "NodeNext",
-		"moduleResolution": "NodeNext",
-		"allowImportingTsExtensions": false,
-		"noEmit": true
-	},
-	"include": ["tests"]
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": ".",
+    "rewriteRelativeImportExtensions": true,
+    "sourceMap": true
+  },
+  "include": ["scripts/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "scripts/survey/**",
+    "scripts/input/tmp/**",
+    "scripts/plans/run-lineage-candidate-loop.ts",
+    "scripts/plans/run-task-plan-loop.ts"
+  ]
 }

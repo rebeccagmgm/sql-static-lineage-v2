@@ -1,6 +1,7 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { readJsonlRecords } from "../../../../scripts/machine-facts/jsonl-store.ts";
 import {
   writeTableInput,
   writeTaskInput,
@@ -8,11 +9,7 @@ import {
 
 const COLLECTED_AT = "2026-01-01T00:00:00.000Z";
 
-function table(
-  dataRoot: string,
-  qualifiedName: string,
-  columns: string,
-): void {
+function table(dataRoot: string, qualifiedName: string, columns: string): void {
   writeTableInput(dataRoot, {
     platform: "hive",
     dataSource: "warehouse",
@@ -76,7 +73,8 @@ export function createValueAndRowsetFixture(dataRoot: string): void {
       qualifiedName: "demo.mid",
     },
     targetEvidenceKind: "TABLE_TASK_RELATION_DIRECTION_UNKNOWN",
-    evidenceProvider: "synthetic:field-lineage-baseline,opencli:szdata.table-task-relation",
+    evidenceProvider:
+      "synthetic:field-lineage-baseline,opencli:szdata.table-task-relation",
     partition: null,
     sql: {
       query: {
@@ -311,7 +309,7 @@ export function readRelationOccurrenceForTask(
   readonly statementIndex: number;
   readonly relationPath: readonly string[];
 } {
-  const relationNodes = readFileSync(
+  const relationNodes = readJsonlRecords(
     join(
       factsRoot,
       "registry",
@@ -320,22 +318,19 @@ export function readRelationOccurrenceForTask(
       "bundle",
       "relation-nodes.jsonl",
     ),
-    "utf8",
-  )
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as { relation_id?: string; relation_type?: string });
+  );
   const relation = relationNodes.find(
     (candidate) =>
       candidate.relation_type === "read" &&
       String(candidate.relation_id).includes(`:root.read.${alias}`),
   );
-  if (!relation?.relation_id) {
+  const relationId = relation?.relation_id;
+  if (typeof relationId !== "string" || relationId.length === 0) {
     throw new Error(`BASELINE_READ_OCCURRENCE_MISSING:${alias}`);
   }
-  const readRelationId = relation.relation_id.split(":relation:")[1];
-  if (!readRelationId) throw new Error(`BASELINE_READ_RELATION_ID_MISSING:${alias}`);
+  const readRelationId = relationId.split(":relation:")[1];
+  if (!readRelationId)
+    throw new Error(`BASELINE_READ_RELATION_ID_MISSING:${alias}`);
   return {
     occurrenceId: `query#0:${readRelationId}`,
     readRelationId,

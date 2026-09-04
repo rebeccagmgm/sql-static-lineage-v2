@@ -41,14 +41,17 @@ export type DiffAction =
 export type DiffRow = {
   readonly taskId: string;
   readonly action: DiffAction;
-  readonly taskCategory?: string;
+  readonly taskCategory?: string | null;
   readonly packDirectory?: string;
   readonly packSqlSlots?: number;
   readonly cacheSqlSlots?: number;
   readonly reason?: string;
 };
 
-function optionValue(argv: readonly string[], name: string): string | undefined {
+function optionValue(
+  argv: readonly string[],
+  name: string,
+): string | undefined {
   const index = argv.indexOf(name);
   if (index < 0) return undefined;
   const value = argv[index + 1];
@@ -94,7 +97,9 @@ function findExistingValidTaskPack(
     const taskPath = join(directory, "task.json");
     if (!existsSync(taskPath)) continue;
     try {
-      const document = JSON.parse(readFileSync(taskPath, "utf8")) as TaskDocument;
+      const document = JSON.parse(
+        readFileSync(taskPath, "utf8"),
+      ) as TaskDocument;
       validateTaskDocument(document);
       if (document.taskId !== taskId) continue;
       for (const sqlFile of document.sqlFiles) {
@@ -172,7 +177,10 @@ export function diffInputPackFromCache(options: {
       counts.ASSEMBLE_FAILED += 1;
       continue;
     }
-    if (assembled.kind === "NOT_FOUND" || assembled.kind === "MANUAL_OR_FROZEN") {
+    if (
+      assembled.kind === "NOT_FOUND" ||
+      assembled.kind === "MANUAL_OR_FROZEN"
+    ) {
       const row: DiffRow = {
         taskId,
         action: "ASSEMBLE_EXCLUDED",
@@ -252,7 +260,11 @@ export function diffInputPackFromCache(options: {
     const ids = rows
       .filter((row) => row.action === action)
       .map((row) => row.taskId);
-    writeFileSync(join(outDir, name), `${ids.join("\n")}${ids.length ? "\n" : ""}`, "utf8");
+    writeFileSync(
+      join(outDir, name),
+      `${ids.join("\n")}${ids.length ? "\n" : ""}`,
+      "utf8",
+    );
   };
   writeIdList("need-create.txt", "NEED_CREATE");
   writeIdList("already-present.txt", "ALREADY_PRESENT");

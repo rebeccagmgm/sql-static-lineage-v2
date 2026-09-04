@@ -1,12 +1,4 @@
-import {
-  cpSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -36,17 +28,6 @@ import type { TerminalTableConfig } from "../scripts/reconcile/consumer/multi-ho
 import { writeHoraeRelationCache } from "../scripts/reconcile/consumer/one-hop/schedule-evidence-cache.ts";
 
 const FIXED_NOW = "2026-08-23T08:00:00.000Z";
-
-const frozen86840It = existsSync(
-  join(
-    import.meta.dirname,
-    "fixtures",
-    "reconcile-one-hop",
-    "86840-input-pack",
-  ),
-)
-  ? it
-  : it.skip;
 
 function dataRoot(): string {
   return mkdtempSync(join(tmpdir(), "sql-lineage-multi-hop-"));
@@ -230,46 +211,6 @@ function rehashIndexForCurrentInputs(
       "contentHash",
     ]),
   };
-}
-
-function materializeFrozenInputPack(sourceRoot: string): string {
-  const root = dataRoot();
-  cpSync(sourceRoot, root, { recursive: true });
-  const visit = (directory: string): void => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        visit(path);
-        continue;
-      }
-      const normalizeEvidenceFile = (relativePath: string): void => {
-        const evidencePath = join(directory, relativePath);
-        const normalized = readFileSync(evidencePath, "utf8").replaceAll(
-          "\r\n",
-          "\n",
-        );
-        writeFileSync(
-          evidencePath,
-          normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized,
-        );
-      };
-      if (entry.name === "task.json") {
-        const task = JSON.parse(readFileSync(path, "utf8")) as {
-          sqlFiles?: { path: string }[];
-        };
-        for (const sqlFile of task.sqlFiles ?? [])
-          normalizeEvidenceFile(sqlFile.path);
-      }
-      if (entry.name === "table.json") {
-        const table = JSON.parse(readFileSync(path, "utf8")) as {
-          ddlFile?: { path: string };
-        };
-        if (table.ddlFile) normalizeEvidenceFile(table.ddlFile.path);
-      }
-    }
-  };
-  visit(root);
-  return root;
 }
 
 describe("reconcileMultiHop", () => {
@@ -692,8 +633,14 @@ JOIN (SELECT id FROM lake.shared_history WHERE src_tbl = 'BOOK') k
     );
     expect(result.taskNodes).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ taskId: "B", upstreamDecision: expect.anything() }),
-        expect.objectContaining({ taskId: "C", upstreamDecision: expect.anything() }),
+        expect.objectContaining({
+          taskId: "B",
+          upstreamDecision: expect.anything(),
+        }),
+        expect.objectContaining({
+          taskId: "C",
+          upstreamDecision: expect.anything(),
+        }),
       ]),
     );
     expect(result.terminals).toEqual(
@@ -709,7 +656,9 @@ JOIN (SELECT id FROM lake.shared_history WHERE src_tbl = 'BOOK') k
 
   it("uses offline schedule cache to pick the unique parent among overlapping overwrite producers", () => {
     const root = dataRoot();
-    const cacheRoot = mkdtempSync(join(tmpdir(), "sql-lineage-schedule-cache-"));
+    const cacheRoot = mkdtempSync(
+      join(tmpdir(), "sql-lineage-schedule-cache-"),
+    );
     for (const table of ["lake.shared", "lake.current", "lake.seed"])
       writeTable(root, table);
     writeReader(root, "A", ["lake.shared"]);
@@ -1090,7 +1039,10 @@ JOIN (SELECT id FROM lake.shared_history WHERE src_tbl = 'BOOK') k
   it("skips external producer recursion for TEMP tables", () => {
     const root = dataRoot();
     writeTable(root, "temp.resolved_scratch");
-    writeReader(root, "A", ["temp.resolved_scratch", "temp.unresolved_scratch"]);
+    writeReader(root, "A", [
+      "temp.resolved_scratch",
+      "temp.unresolved_scratch",
+    ]);
     const index = buildTableProducerIndex(root, { now: () => FIXED_NOW });
 
     const result = run(root, index, "A", { maxDepth: 2 });
@@ -1102,18 +1054,24 @@ JOIN (SELECT id FROM lake.shared_history WHERE src_tbl = 'BOOK') k
         expect.objectContaining({
           taskId: "A",
           reason: "TASK_LOCAL_MATERIALIZATION",
-          table: expect.objectContaining({ qualifiedName: "temp.resolved_scratch" }),
+          table: expect.objectContaining({
+            qualifiedName: "temp.resolved_scratch",
+          }),
           detail: { rule: "QUALIFIED_NAME_PREFIX", pattern: "TEMP.*" },
         }),
         expect.objectContaining({
           taskId: "A",
           reason: "TASK_LOCAL_MATERIALIZATION",
-          table: expect.objectContaining({ qualifiedName: "temp.unresolved_scratch" }),
+          table: expect.objectContaining({
+            qualifiedName: "temp.unresolved_scratch",
+          }),
           detail: { rule: "QUALIFIED_NAME_PREFIX", pattern: "TEMP.*" },
         }),
       ]),
     );
-    expect(terminalReasons(result)).not.toContain("NO_CONFIRMED_PRODUCER_OBSERVED");
+    expect(terminalReasons(result)).not.toContain(
+      "NO_CONFIRMED_PRODUCER_OBSERVED",
+    );
     expect(terminalReasons(result)).not.toContain("TABLE_IDENTITY_UNRESOLVED");
   });
 
@@ -1336,58 +1294,6 @@ JOIN (SELECT id FROM lake.shared_history WHERE src_tbl = 'BOOK') k
       "schedule-only-parent",
     );
   });
-
-  frozen86840It(
-    "replays frozen 86840 at depth one with 27 reads, 22 local producers, and ref_dw_cd_val terminal",
-    () => {
-      const fixtureRoot = join(
-        import.meta.dirname,
-        "fixtures",
-        "reconcile-one-hop",
-      );
-      const frozenEvidence = JSON.parse(
-        readFileSync(join(fixtureRoot, "86840-evidence.json"), "utf8"),
-      ) as { horaeRows: Record<string, unknown>[] };
-      const root = materializeFrozenInputPack(
-        join(fixtureRoot, "86840-input-pack"),
-      );
-      const index = buildTableProducerIndex(root, { now: () => FIXED_NOW });
-      const snapshot = rootOneHop(
-        root,
-        index,
-        "86840",
-        frozenEvidence.horaeRows,
-      );
-
-      const result = run(root, index, "86840", {
-        maxDepth: 1,
-        maxTasks: 100,
-        maxEdges: 500,
-        rootOneHop: snapshot,
-      });
-
-      expect(result.readEdges).toHaveLength(27);
-      expect(result.producerBridges).toHaveLength(22);
-      expect(result.taskNodes).toHaveLength(23);
-      expect(result.scheduleSkeleton.parents).toHaveLength(26);
-      expect(result.terminals).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            taskId: "86840",
-            table: expect.objectContaining({
-              qualifiedName: "pdata_n.ref_dw_cd_val",
-            }),
-            reason: "NO_CONFIRMED_PRODUCER_OBSERVED",
-          }),
-        ]),
-      );
-      expect(
-        result.producerBridges.some(
-          (bridge) => bridge.table.qualifiedName === "pdata_n.ref_dw_cd_val",
-        ),
-      ).toBe(false);
-    },
-  );
 
   it("publishes and enforces a closed multi-hop artifact contract", () => {
     const root = dataRoot();

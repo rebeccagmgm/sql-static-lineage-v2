@@ -1,6 +1,7 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { readJsonlRecords } from "../../../scripts/machine-facts/jsonl-store.ts";
 import {
   writeTableInput,
   writeTaskInput,
@@ -325,15 +326,23 @@ function tableNamesMatch(left: string, right: string): boolean {
 
 export function syntheticTableLineageWithFacts(
   factsRoot: string,
-  tableLineage: ReturnType<typeof syntheticTableLineage> = syntheticTableLineage(),
+  tableLineage: ReturnType<
+    typeof syntheticTableLineage
+  > = syntheticTableLineage(),
 ) {
-  const roleByTaskPair = new Map<string, "PRIMARY" | "ADDITIONAL" | "UNKNOWN">();
+  const roleByTaskPair = new Map<
+    string,
+    "PRIMARY" | "ADDITIONAL" | "UNKNOWN"
+  >();
   for (const rawNode of tableLineage.taskNodes) {
     const decision = rawNode.upstreamDecision;
     for (const producerTaskId of decision.primary)
       roleByTaskPair.set(`${rawNode.taskId}\u0000${producerTaskId}`, "PRIMARY");
     for (const producerTaskId of decision.additional)
-      roleByTaskPair.set(`${rawNode.taskId}\u0000${producerTaskId}`, "ADDITIONAL");
+      roleByTaskPair.set(
+        `${rawNode.taskId}\u0000${producerTaskId}`,
+        "ADDITIONAL",
+      );
     for (const producerTaskId of decision.unknown)
       roleByTaskPair.set(`${rawNode.taskId}\u0000${producerTaskId}`, "UNKNOWN");
   }
@@ -349,10 +358,7 @@ export function syntheticTableLineageWithFacts(
       "bundle",
       "relation-nodes.jsonl",
     );
-    const records = readFileSync(path, "utf8")
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const records = readJsonlRecords(path);
     relationNodesByTask.set(taskId, records);
   }
 
@@ -369,16 +375,17 @@ export function syntheticTableLineageWithFacts(
         return { ...bridge, producerRole };
       const bridgeTable = bridge.table as Record<string, unknown>;
       const bridgeTableName = String(bridgeTable.qualifiedName ?? "");
-      const relation = (relationNodesByTask.get(String(bridge.consumerTaskId)) ?? []).find(
-        (candidate) => {
-          const nested = candidate.relation as Record<string, unknown> | undefined;
-          return (
-            candidate.relation_type === "read" &&
-            typeof nested?.table === "string" &&
-            tableNamesMatch(nested.table, bridgeTableName)
-          );
-        },
-      );
+      const relation = (
+        relationNodesByTask.get(String(bridge.consumerTaskId)) ?? []
+      ).find((candidate) => {
+        const nested = candidate.relation as
+          Record<string, unknown> | undefined;
+        return (
+          candidate.relation_type === "read" &&
+          typeof nested?.table === "string" &&
+          tableNamesMatch(nested.table, bridgeTableName)
+        );
+      });
       if (!relation) return producerRole ? { ...bridge, producerRole } : bridge;
       const fullRelationId = String(relation.relation_id ?? "");
       const relativeRelationId =

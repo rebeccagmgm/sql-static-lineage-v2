@@ -3,9 +3,8 @@ import { resolve } from "node:path";
 import {
   loadPersistedTableCache,
   tableFromDirectEvidence,
-  type TableEvidence,
 } from "../mainline/collect-one-task-input-pack.ts";
-import { writeTableInput } from "../shared/input-pack.ts";
+import { writeTableInput, type TableEvidence } from "../shared/input-pack.ts";
 
 type ProducerIndexLike = {
   nonConfirmedRelations?: readonly {
@@ -42,7 +41,9 @@ function qualifiedNamesFrom(
       rows
         .filter((row) => row.taskCategory === taskCategory)
         .map((row) => row.tableRef?.qualifiedName?.trim())
-        .filter((value): value is string => value !== undefined && value !== ""),
+        .filter(
+          (value): value is string => value !== undefined && value !== "",
+        ),
     ),
   ].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
 }
@@ -78,12 +79,16 @@ const errors: Array<{ qualifiedName: string; error: string }> = [];
 
 for (const qualifiedName of targets) {
   try {
-    const evidence: TableEvidence | undefined =
-      tableFromDirectEvidence(qualifiedName, undefined, undefined, {
+    const evidence: TableEvidence | undefined = tableFromDirectEvidence(
+      qualifiedName,
+      undefined,
+      undefined,
+      {
         preferDirectLookup: true,
         directOnly: true,
         skipDescriptionRefresh: true,
-      });
+      },
+    );
     if (evidence === undefined) {
       notFound.push(qualifiedName);
       continue;

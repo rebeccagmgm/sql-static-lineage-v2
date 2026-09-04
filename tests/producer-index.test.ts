@@ -1,5 +1,4 @@
 import {
-  cpSync,
   existsSync,
   mkdtempSync,
   readFileSync,
@@ -38,60 +37,8 @@ import {
   lookupNonConfirmedRelations,
 } from "../scripts/query/producer-index-query.ts";
 
-const frozen86840It = existsSync(
-  join(
-    import.meta.dirname,
-    "fixtures",
-    "reconcile-one-hop",
-    "86840-input-pack",
-  ),
-)
-  ? it
-  : it.skip;
-
 function dataRoot(): string {
   return mkdtempSync(join(tmpdir(), "sql-lineage-producer-index-"));
-}
-
-function materializeFrozenInputPack(sourceRoot: string): string {
-  const root = dataRoot();
-  cpSync(sourceRoot, root, { recursive: true });
-  const visit = (directory: string): void => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        visit(path);
-        continue;
-      }
-      const normalizeEvidenceFile = (relativePath: string): void => {
-        const evidencePath = join(directory, relativePath);
-        const normalized = readFileSync(evidencePath, "utf8").replaceAll(
-          "\r\n",
-          "\n",
-        );
-        writeFileSync(
-          evidencePath,
-          normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized,
-        );
-      };
-      if (entry.name === "task.json") {
-        const task = JSON.parse(readFileSync(path, "utf8")) as {
-          sqlFiles?: { path: string }[];
-        };
-        for (const sqlFile of task.sqlFiles ?? []) {
-          normalizeEvidenceFile(sqlFile.path);
-        }
-      }
-      if (entry.name === "table.json") {
-        const table = JSON.parse(readFileSync(path, "utf8")) as {
-          ddlFile?: { path: string };
-        };
-        if (table.ddlFile) normalizeEvidenceFile(table.ddlFile.path);
-      }
-    }
-  };
-  visit(root);
-  return root;
 }
 
 function writeTable(
@@ -1037,7 +984,9 @@ describe("table producer index", () => {
       now: () => "2026-08-23T01:00:00.000Z",
     });
     expect(first.rebuilt).toBe(true);
-    expect(first.indexPath).toBe(mutableProducerIndexPaths(indexRoot).indexPath);
+    expect(first.indexPath).toBe(
+      mutableProducerIndexPaths(indexRoot).indexPath,
+    );
     expect(existsSync(first.indexPath)).toBe(true);
 
     writeTask(root, "p2", {
@@ -1319,47 +1268,4 @@ describe("table producer index", () => {
     expect(writeTableProducerIndex(output, partial).changed).toBe(true);
     expect(loadTableProducerIndex(output).buildStatus).toBe("PARTIAL");
   });
-
-  frozen86840It(
-    "indexes the 22 frozen local 86840 producers without using supplemental responses",
-    () => {
-      const fixtureRoot = join(
-        process.cwd(),
-        "tests",
-        "fixtures",
-        "reconcile-one-hop",
-      );
-      const evidence = JSON.parse(
-        readFileSync(join(fixtureRoot, "86840-evidence.json"), "utf8"),
-      ) as {
-        horaeRows: { task_id: string }[];
-        supplementalResponses: Record<string, unknown>;
-      };
-      const supplementalTaskIds = new Set(
-        Object.keys(evidence.supplementalResponses),
-      );
-      const expectedLocalTaskIds = evidence.horaeRows
-        .map((row) => row.task_id)
-        .filter((taskId) => !supplementalTaskIds.has(taskId))
-        .sort();
-
-      const index = buildTableProducerIndex(
-        materializeFrozenInputPack(join(fixtureRoot, "86840-input-pack")),
-        { now: () => "2026-08-23T04:00:00.000Z" },
-      );
-
-      expect(index.buildStatus, JSON.stringify(index.issues, null, 2)).toBe(
-        "SUCCESS",
-      );
-      expect(
-        index.confirmedProducerEdges.map((edge) => edge.taskId).sort(),
-      ).toEqual(expectedLocalTaskIds);
-      expect(index.confirmedProducerEdges).toHaveLength(22);
-      expect(
-        index.confirmedProducerEdges.some((edge) =>
-          supplementalTaskIds.has(edge.taskId),
-        ),
-      ).toBe(false);
-    },
-  );
 });
