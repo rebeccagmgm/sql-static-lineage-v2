@@ -1,0 +1,57 @@
+{
+  "nodes": [
+    {
+      "task_id": "176827",
+      "relation_id": "task:176827:statement:0:relation:read.driver",
+      "relation_type": "read",
+      "relation": {
+        "id": "task:176827:statement:0:relation:read.driver",
+        "type": "read",
+        "table": "pdata_n.t98_sb_otc_opt_comp_info"
+      }
+    },
+    {
+      "task_id": "176827",
+      "relation_id": "task:176827:statement:0:relation:read.const",
+      "relation_type": "read",
+      "relation": {
+        "id": "task:176827:statement:0:relation:read.const",
+        "type": "read",
+        "table": "pdata_n.t02_pub_covt_const"
+      }
+    },
+    {
+      "task_id": "176827",
+      "relation_id": "task:176827:statement:0:relation:join.left",
+      "relation_type": "join",
+      "relation": {
+        "id": "task:176827:statement:0:relation:join.left",
+        "type": "join",
+        "join_type": "LEFT",
+        "left": "task:176827:statement:0:relation:read.driver",
+        "right": "task:176827:statement:0:relation:read.const",
+        "condition_expr": "driver.conv_cd = const.conv_cd",
+        "condition_columns": [
+          {
+            "name": "conv_cd",
+            "physical": [{ "column": "conv_cd", "table": "pdata_n.t98_sb_otc_opt_comp_info" }]
+          },
+          {
+            "name": "conv_cd",
+            "physical": [{ "column": "conv_cd", "table": "pdata_n.t02_pub_covt_const" }]
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from_relation_id": "task:176827:statement:0:relation:read.driver",
+      "to_relation_id": "task:176827:statement:0:relation:join.left"
+    },
+    {
+      "from_relation_id": "task:176827:statement:0:relation:read.const",
+      "to_relation_id": "task:176827:statement:0:relation:join.left"
+    }
+  ]
+}

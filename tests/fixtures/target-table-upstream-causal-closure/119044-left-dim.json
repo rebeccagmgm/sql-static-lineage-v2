@@ -1,0 +1,98 @@
+{
+  "nodes": [
+    {
+      "task_id": "119044",
+      "relation_id": "task:119044:statement:0:relation:read.driver",
+      "relation_type": "read",
+      "relation": {
+        "id": "task:119044:statement:0:relation:read.driver",
+        "type": "read",
+        "table": "pdata_n.t98_sb_otc_opt_comp_info"
+      }
+    },
+    {
+      "task_id": "119044",
+      "relation_id": "task:119044:statement:0:relation:read.unused",
+      "relation_type": "read",
+      "relation": {
+        "id": "task:119044:statement:0:relation:read.unused",
+        "type": "read",
+        "table": "pdata_n.t03_agt_clas_h"
+      }
+    },
+    {
+      "task_id": "119044",
+      "relation_id": "task:119044:statement:0:relation:read.rela",
+      "relation_type": "read",
+      "relation": {
+        "id": "task:119044:statement:0:relation:read.rela",
+        "type": "read",
+        "table": "pdata_n.t03_agt_rela_h"
+      }
+    },
+    {
+      "task_id": "119044",
+      "relation_id": "task:119044:statement:0:relation:join.unused",
+      "relation_type": "join",
+      "relation": {
+        "id": "task:119044:statement:0:relation:join.unused",
+        "type": "join",
+        "join_type": "LEFT",
+        "left": "task:119044:statement:0:relation:read.driver",
+        "right": "task:119044:statement:0:relation:read.unused",
+        "condition_expr": "driver.clas_id = unused.clas_id",
+        "condition_columns": [
+          {
+            "name": "clas_id",
+            "physical": [{ "column": "clas_id", "table": "pdata_n.t98_sb_otc_opt_comp_info" }]
+          },
+          {
+            "name": "clas_id",
+            "physical": [{ "column": "clas_id", "table": "pdata_n.t03_agt_clas_h" }]
+          }
+        ]
+      }
+    },
+    {
+      "task_id": "119044",
+      "relation_id": "task:119044:statement:0:relation:join.rela",
+      "relation_type": "join",
+      "relation": {
+        "id": "task:119044:statement:0:relation:join.rela",
+        "type": "join",
+        "join_type": "LEFT",
+        "left": "task:119044:statement:0:relation:join.unused",
+        "right": "task:119044:statement:0:relation:read.rela",
+        "condition_expr": "driver.agt_id = rela.agt_id",
+        "condition_columns": [
+          {
+            "name": "agt_id",
+            "physical": [{ "column": "agt_id", "table": "pdata_n.t98_sb_otc_opt_comp_info" }]
+          },
+          {
+            "name": "Book_Agt_Id",
+            "physical": [{ "column": "Book_Agt_Id", "table": "pdata_n.t03_agt_rela_h" }]
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from_relation_id": "task:119044:statement:0:relation:read.driver",
+      "to_relation_id": "task:119044:statement:0:relation:join.unused"
+    },
+    {
+      "from_relation_id": "task:119044:statement:0:relation:read.unused",
+      "to_relation_id": "task:119044:statement:0:relation:join.unused"
+    },
+    {
+      "from_relation_id": "task:119044:statement:0:relation:join.unused",
+      "to_relation_id": "task:119044:statement:0:relation:join.rela"
+    },
+    {
+      "from_relation_id": "task:119044:statement:0:relation:read.rela",
+      "to_relation_id": "task:119044:statement:0:relation:join.rela"
+    }
+  ]
+}

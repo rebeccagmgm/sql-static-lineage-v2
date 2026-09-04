@@ -1,0 +1,372 @@
+{
+  "schemaVersion": "1.2.0",
+  "artifactType": "FIELD_MULTI_HOP_RECONCILIATION",
+  "request": {
+    "rootTaskId": "100",
+    "rootTable": "demo.root",
+    "rootWriteObservationIds": [
+      "write-observation:100:platform-target:0"
+    ],
+    "rootFields": [
+      "out_a"
+    ],
+    "rootFieldSelection": "EXPLICIT",
+    "factsPolicy": "allow-legacy-partial"
+  },
+  "overallStatus": "PARTIAL",
+  "rootNodeIds": [
+    "field-node:100:hive|warehouse|demo.root__warehouse|demo.root|out_a:output-binding:100:task:100:slot:query:statement:0:0"
+  ],
+  "nodes": [
+    {
+      "nodeId": "field-node:100:hive|warehouse|demo.root__warehouse|demo.root|out_a:output-binding:100:task:100:slot:query:statement:0:0",
+      "taskId": "100",
+      "taskName": "demo.root.task",
+      "depth": 0,
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.root__warehouse",
+        "qualifiedName": "demo.root",
+        "column": "out_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "bindingId": "output-binding:100:task:100:slot:query:statement:0:0",
+      "expressionId": "task:100:statement:0:relation:root.project:expression:project_expression:0",
+      "expressionText": "m.mid_a AS out_a",
+      "evidenceStatus": "PROVISIONAL_LEGACY",
+      "inputDependencyStatus": "PHYSICAL"
+    },
+    {
+      "nodeId": "field-node:200:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:200:task:200:slot:query:statement:0:0",
+      "taskId": "200",
+      "taskName": "demo.mid.task",
+      "depth": 1,
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.mid__warehouse",
+        "qualifiedName": "demo.mid",
+        "column": "mid_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "bindingId": "output-binding:200:task:200:slot:query:statement:0:0",
+      "expressionId": "task:200:statement:0:relation:root.project:expression:project_expression:0",
+      "expressionText": "s.src_a",
+      "evidenceStatus": "PROVISIONAL_LEGACY",
+      "inputDependencyStatus": "PHYSICAL"
+    },
+    {
+      "nodeId": "field-node:300:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:300:task:300:slot:query:statement:0:0",
+      "taskId": "300",
+      "taskName": "demo.source.task",
+      "depth": 2,
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.source__warehouse",
+        "qualifiedName": "demo.source",
+        "column": "src_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "bindingId": "output-binding:300:task:300:slot:query:statement:0:0",
+      "expressionId": "task:300:statement:0:relation:root.project:expression:project_expression:0",
+      "expressionText": "m.mid_a AS src_a",
+      "evidenceStatus": "PROVISIONAL_LEGACY",
+      "inputDependencyStatus": "PHYSICAL"
+    },
+    {
+      "nodeId": "field-source-node:100:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:100:task:100:slot:query:statement:0:0",
+      "taskId": "100",
+      "taskName": "demo.root.task",
+      "depth": 0,
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.mid__warehouse",
+        "qualifiedName": "demo.mid",
+        "column": "mid_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "bindingId": null,
+      "expressionId": null,
+      "expressionText": null,
+      "evidenceStatus": "PROVISIONAL_LEGACY"
+    },
+    {
+      "nodeId": "field-source-node:200:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:200:task:200:slot:query:statement:0:0",
+      "taskId": "200",
+      "taskName": "demo.mid.task",
+      "depth": 1,
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.source__warehouse",
+        "qualifiedName": "demo.source",
+        "column": "src_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "bindingId": null,
+      "expressionId": null,
+      "expressionText": null,
+      "evidenceStatus": "PROVISIONAL_LEGACY"
+    },
+    {
+      "nodeId": "field-source-node:300:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:300:task:300:slot:query:statement:0:0",
+      "taskId": "300",
+      "taskName": "demo.source.task",
+      "depth": 2,
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.mid__warehouse",
+        "qualifiedName": "demo.mid",
+        "column": "mid_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "bindingId": null,
+      "expressionId": null,
+      "expressionText": null,
+      "evidenceStatus": "PROVISIONAL_LEGACY"
+    }
+  ],
+  "edges": [
+    {
+      "edgeId": "value-edge:field-node:200:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:200:task:200:slot:query:statement:0:0->field-source-node:100:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:100:task:100:slot:query:statement:0:0:cross-task",
+      "fromNodeId": "field-node:200:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:200:task:200:slot:query:statement:0:0",
+      "toNodeId": "field-source-node:100:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:100:task:100:slot:query:statement:0:0",
+      "consumerTaskId": "100",
+      "producerTaskId": "200",
+      "kind": "VALUE_FLOW",
+      "mapping": "demo.mid.mid_a -> demo.mid.mid_a",
+      "evidenceStatus": "PROVISIONAL_LEGACY",
+      "evidenceRefs": [
+        "field-lineage:consumer-read:100:query#0:root.read.m:root.read.m",
+        "field-lineage:producer-write:200:write-observation:200:0:output-binding:200:task:200:slot:query:statement:0:0",
+        "machine-facts:registry/tasks/100/bundle/dataset-io.jsonl",
+        "machine-facts:registry/tasks/100/bundle/relation-nodes.jsonl",
+        "machine-facts:registry/tasks/200/bundle/dataset-io.jsonl",
+        "machine-facts:registry/tasks/200/bundle/output-field-bindings.jsonl"
+      ]
+    },
+    {
+      "edgeId": "value-edge:field-node:300:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:300:task:300:slot:query:statement:0:0->field-source-node:200:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:200:task:200:slot:query:statement:0:0:cross-task",
+      "fromNodeId": "field-node:300:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:300:task:300:slot:query:statement:0:0",
+      "toNodeId": "field-source-node:200:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:200:task:200:slot:query:statement:0:0",
+      "consumerTaskId": "200",
+      "producerTaskId": "300",
+      "kind": "VALUE_FLOW",
+      "mapping": "demo.source.src_a -> demo.source.src_a",
+      "evidenceStatus": "PROVISIONAL_LEGACY",
+      "evidenceRefs": [
+        "field-lineage:consumer-read:200:query#0:root.read.s:root.read.s",
+        "field-lineage:producer-write:300:write-observation:300:0:output-binding:300:task:300:slot:query:statement:0:0",
+        "machine-facts:registry/tasks/200/bundle/dataset-io.jsonl",
+        "machine-facts:registry/tasks/200/bundle/relation-nodes.jsonl",
+        "machine-facts:registry/tasks/300/bundle/dataset-io.jsonl",
+        "machine-facts:registry/tasks/300/bundle/output-field-bindings.jsonl"
+      ]
+    },
+    {
+      "edgeId": "value-edge:field-source-node:100:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:100:task:100:slot:query:statement:0:0->field-node:100:hive|warehouse|demo.root__warehouse|demo.root|out_a:output-binding:100:task:100:slot:query:statement:0:0:task:100:statement:0:relation:root.project:expression:project_expression:0",
+      "fromNodeId": "field-source-node:100:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:100:task:100:slot:query:statement:0:0",
+      "toNodeId": "field-node:100:hive|warehouse|demo.root__warehouse|demo.root|out_a:output-binding:100:task:100:slot:query:statement:0:0",
+      "consumerTaskId": "100",
+      "producerTaskId": null,
+      "kind": "VALUE_FLOW",
+      "mapping": "mid_a -> out_a",
+      "evidenceStatus": "PROVISIONAL_LEGACY",
+      "evidenceRefs": [
+        "machine-facts:registry/tasks/100/bundle/field-expression-nodes.jsonl",
+        "machine-facts:registry/tasks/100/bundle/output-field-bindings.jsonl"
+      ]
+    },
+    {
+      "edgeId": "value-edge:field-source-node:200:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:200:task:200:slot:query:statement:0:0->field-node:200:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:200:task:200:slot:query:statement:0:0:task:200:statement:0:relation:root.project:expression:project_expression:0",
+      "fromNodeId": "field-source-node:200:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:200:task:200:slot:query:statement:0:0",
+      "toNodeId": "field-node:200:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:200:task:200:slot:query:statement:0:0",
+      "consumerTaskId": "200",
+      "producerTaskId": null,
+      "kind": "VALUE_FLOW",
+      "mapping": "src_a -> mid_a",
+      "evidenceStatus": "PROVISIONAL_LEGACY",
+      "evidenceRefs": [
+        "machine-facts:registry/tasks/200/bundle/field-expression-nodes.jsonl",
+        "machine-facts:registry/tasks/200/bundle/output-field-bindings.jsonl"
+      ]
+    },
+    {
+      "edgeId": "value-edge:field-source-node:300:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:300:task:300:slot:query:statement:0:0->field-node:300:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:300:task:300:slot:query:statement:0:0:task:300:statement:0:relation:root.project:expression:project_expression:0",
+      "fromNodeId": "field-source-node:300:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:300:task:300:slot:query:statement:0:0",
+      "toNodeId": "field-node:300:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:300:task:300:slot:query:statement:0:0",
+      "consumerTaskId": "300",
+      "producerTaskId": null,
+      "kind": "VALUE_FLOW",
+      "mapping": "mid_a -> src_a",
+      "evidenceStatus": "PROVISIONAL_LEGACY",
+      "evidenceRefs": [
+        "machine-facts:registry/tasks/300/bundle/field-expression-nodes.jsonl",
+        "machine-facts:registry/tasks/300/bundle/output-field-bindings.jsonl"
+      ]
+    }
+  ],
+  "datasetControls": [
+    {
+      "controlId": "dataset-control:100:task:100:statement:0:relation:root.filter:hive|warehouse|demo.mid__warehouse|demo.mid|filter_key",
+      "taskId": "100",
+      "statementId": "task:100:slot:query:statement:0",
+      "relationId": "task:100:statement:0:relation:root.filter",
+      "subtype": "FILTER",
+      "masking": false,
+      "grain": "REDUCE",
+      "grainReason": "GRAIN_FILTER_MAY_DROP_ROWS",
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.mid__warehouse",
+        "qualifiedName": "demo.mid",
+        "column": "filter_key",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "sourceText": "m.filter_key <> 'X'",
+      "evidenceStatus": "PROVISIONAL_LEGACY",
+      "reasonCode": null,
+      "evidenceRefs": [
+        "machine-facts:registry/tasks/100/bundle/relation-nodes.jsonl"
+      ]
+    }
+  ],
+  "fieldConditionals": [],
+  "candidates": [
+    {
+      "candidateId": "candidate:200:400:hive|warehouse|demo.source__warehouse|demo.source|src_a",
+      "consumerTaskId": "200",
+      "producerTaskId": "400",
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.source__warehouse",
+        "qualifiedName": "demo.source",
+        "column": "src_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "reasonCode": "ONE_HOP_ADDITIONAL_NOT_RECURSED",
+      "evidenceStatus": "CANDIDATE"
+    }
+  ],
+  "gaps": [
+    {
+      "gapId": "gap:field-source-node:200:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:200:task:200:slot:query:statement:0:0:cross_task_bridge_evidence_incomplete:500",
+      "taskId": "500",
+      "nodeId": "field-source-node:200:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:200:task:200:slot:query:statement:0:0",
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.source__warehouse",
+        "qualifiedName": "demo.source",
+        "column": "src_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "reasonCode": "CROSS_TASK_BRIDGE_EVIDENCE_INCOMPLETE",
+      "message": "cross-Task field expansion lacks a continuous consumer READ occurrence to producer WRITE/output binding evidence chain",
+      "evidenceStatus": "UNRESOLVED",
+      "evidenceRefs": [
+        "field-lineage:consumer-read:200:query#0:root.read.s:root.read.s",
+        "machine-facts:registry/tasks/200/bundle/dataset-io.jsonl",
+        "machine-facts:registry/tasks/200/bundle/relation-nodes.jsonl"
+      ]
+    },
+    {
+      "gapId": "gap:field-source-node:200:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:200:task:200:slot:query:statement:0:0:task_input_pack_excluded:500",
+      "taskId": "500",
+      "nodeId": "field-source-node:200:hive|warehouse|demo.source__warehouse|demo.source|src_a:output-binding:200:task:200:slot:query:statement:0:0",
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.source__warehouse",
+        "qualifiedName": "demo.source",
+        "column": "src_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "reasonCode": "TASK_INPUT_PACK_EXCLUDED",
+      "message": "upstream Task Input Pack is excluded: PHYSICAL_TABLE_NOT_FOUND",
+      "evidenceStatus": "UNRESOLVED",
+      "evidenceRefs": [
+        "<temp-root>\\data.input-pack-status.json"
+      ]
+    },
+    {
+      "gapId": "gap:field-source-node:300:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:300:task:300:slot:query:statement:0:0:cycle:200:output-binding:200:task:200:slot:query:statement:0:0",
+      "taskId": "200",
+      "nodeId": "field-source-node:300:hive|warehouse|demo.mid__warehouse|demo.mid|mid_a:output-binding:300:task:300:slot:query:statement:0:0",
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.mid__warehouse",
+        "qualifiedName": "demo.mid",
+        "column": "mid_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "reasonCode": "CYCLE",
+      "message": "field traversal returned to a Task/physical-field/output-binding state already active on this path",
+      "evidenceStatus": "UNRESOLVED",
+      "evidenceRefs": [
+        "field-lineage:consumer-read:300:query#0:root.read.m:root.read.m",
+        "field-lineage:producer-write:200:write-observation:200:0:output-binding:200:task:200:slot:query:statement:0:0",
+        "machine-facts:registry/tasks/200/bundle/dataset-io.jsonl",
+        "machine-facts:registry/tasks/200/bundle/output-field-bindings.jsonl",
+        "machine-facts:registry/tasks/300/bundle/dataset-io.jsonl",
+        "machine-facts:registry/tasks/300/bundle/relation-nodes.jsonl"
+      ]
+    }
+  ],
+  "tableEdges": [
+    {
+      "consumerTaskId": "100",
+      "producerTaskId": "200",
+      "classification": "PRIMARY"
+    },
+    {
+      "consumerTaskId": "200",
+      "producerTaskId": "400",
+      "classification": "ADDITIONAL"
+    },
+    {
+      "consumerTaskId": "200",
+      "producerTaskId": "300",
+      "classification": "PRIMARY"
+    },
+    {
+      "consumerTaskId": "200",
+      "producerTaskId": "500",
+      "classification": "PRIMARY"
+    },
+    {
+      "consumerTaskId": "300",
+      "producerTaskId": "200",
+      "classification": "PRIMARY"
+    }
+  ],
+  "limits": {
+    "maxDepth": 8,
+    "maxStates": 100,
+    "maxPaths": 100,
+    "truncated": false,
+    "reasons": []
+  },
+  "boundaries": {
+    "staticSqlOnly": true,
+    "runtimeExecution": "NOT_EVALUATED",
+    "dataCorrectness": "NOT_EVALUATED",
+    "businessAcceptance": "NOT_EVALUATED"
+  },
+  "counts": {
+    "nodes": 6,
+    "edges": 5,
+    "datasetControls": 1,
+    "fieldConditionals": 0,
+    "candidates": 1,
+    "gaps": 3
+  },
+  "contentHash": "24f89317d62631c8b088b457b26c70ea740fca224ea15ade0b880b9ad6933f2b"
+}

@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1.0.0",
+  "artifactType": "FIELD_MULTI_HOP_RECONCILIATION",
+  "request": {
+    "rootTaskId": "legacy-root",
+    "rootTable": "demo.root",
+    "rootFields": [
+      "out_a"
+    ],
+    "factsPolicy": "allow-legacy-partial"
+  },
+  "overallStatus": "PARTIAL",
+  "rootNodeIds": [
+    "field-node:legacy-root:out_a"
+  ],
+  "nodes": [
+    {
+      "nodeId": "field-node:legacy-root:out_a",
+      "taskId": "legacy-root",
+      "taskName": "demo.root.task",
+      "depth": 0,
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.root__warehouse",
+        "qualifiedName": "demo.root",
+        "column": "out_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "bindingId": "binding:legacy-root:out_a",
+      "expressionId": "expression:legacy-root:out_a",
+      "expressionText": "src_a",
+      "evidenceStatus": "PROVISIONAL_LEGACY"
+    },
+    {
+      "nodeId": "field-source-node:legacy-source:src_a",
+      "taskId": "legacy-source",
+      "taskName": "demo.source.task",
+      "depth": 1,
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "demo.source__warehouse",
+        "qualifiedName": "demo.source",
+        "column": "src_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "bindingId": null,
+      "expressionId": null,
+      "expressionText": null,
+      "evidenceStatus": "PROVISIONAL_LEGACY"
+    }
+  ],
+  "edges": [
+    {
+      "edgeId": "value-edge:legacy-source:src_a",
+      "fromNodeId": "field-source-node:legacy-source:src_a",
+      "toNodeId": "field-node:legacy-root:out_a",
+      "consumerTaskId": "legacy-root",
+      "producerTaskId": "legacy-source",
+      "kind": "VALUE_FLOW",
+      "mapping": "src_a -> out_a",
+      "evidenceStatus": "PROVISIONAL_LEGACY",
+      "evidenceRefs": [
+        "legacy:field-edge"
+      ]
+    }
+  ],
+  "rowsetControls": [],
+  "candidates": [],
+  "tableEdges": [],
+  "counts": {
+    "nodes": 2,
+    "edges": 1,
+    "rowsetControls": 0,
+    "candidates": 0,
+    "gaps": 0
+  },
+  "limits": {
+    "maxDepth": 8,
+    "maxStates": 100,
+    "maxPaths": 100,
+    "truncated": false,
+    "reasons": []
+  }
+}

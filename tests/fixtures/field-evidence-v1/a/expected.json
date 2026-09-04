@@ -1,0 +1,6 @@
+{
+  "taskId": "176827",
+  "outputColumn": "pric",
+  "sourceTableSuffix": "t98_sb_tit_day_hold_indx",
+  "b0RelationMarker": "setop.b0"
+}

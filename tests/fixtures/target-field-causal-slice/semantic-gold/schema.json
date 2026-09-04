@@ -1,0 +1,31 @@
+{
+  "records": [
+    {
+      "qualified_name": "mart.source_a",
+      "status": "SUCCESS",
+      "guid": "semantic-gold-source-a",
+      "source": "FROZEN_TEST_SCHEMA",
+      "columns": [
+        { "name": "amount", "partition": false },
+        { "name": "keep_a", "partition": false }
+      ]
+    },
+    {
+      "qualified_name": "mart.source_b",
+      "status": "SUCCESS",
+      "guid": "semantic-gold-source-b",
+      "source": "FROZEN_TEST_SCHEMA",
+      "columns": [
+        { "name": "amount", "partition": false },
+        { "name": "keep_b", "partition": false }
+      ]
+    },
+    {
+      "qualified_name": "mart.target",
+      "status": "SUCCESS",
+      "guid": "semantic-gold-target",
+      "source": "FROZEN_TEST_SCHEMA",
+      "columns": [{ "name": "amount", "partition": false }]
+    }
+  ]
+}

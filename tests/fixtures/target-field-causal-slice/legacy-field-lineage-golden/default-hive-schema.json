@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "1.2.0",
+  "artifactType": "FIELD_MULTI_HOP_RECONCILIATION",
+  "request": {
+    "rootTaskId": "110",
+    "rootTable": "hive_db.root",
+    "rootWriteObservationIds": [
+      "write-observation:110:platform-target:0"
+    ],
+    "rootFields": [
+      "out_a"
+    ],
+    "rootFieldSelection": "EXPLICIT",
+    "factsPolicy": "current-only"
+  },
+  "overallStatus": "PARTIAL",
+  "rootNodeIds": [
+    "field-node:110:hive|warehouse|hive_db.root__warehouse|hive_db.root|out_a:output-binding:110:task:110:slot:query:statement:0:0"
+  ],
+  "nodes": [
+    {
+      "nodeId": "field-node:110:hive|warehouse|hive_db.root__warehouse|hive_db.root|out_a:output-binding:110:task:110:slot:query:statement:0:0",
+      "taskId": "110",
+      "taskName": "hive_db.root.task",
+      "depth": 0,
+      "field": {
+        "platform": "hive",
+        "dataSource": "warehouse",
+        "stableTableId": "hive_db.root__warehouse",
+        "qualifiedName": "hive_db.root",
+        "column": "out_a",
+        "identityStatus": "SCHEMA_BACKED"
+      },
+      "bindingId": "output-binding:110:task:110:slot:query:statement:0:0",
+      "expressionId": "task:110:statement:0:relation:root.project:expression:project_expression:0",
+      "expressionText": "s.src_a AS out_a",
+      "evidenceStatus": "CONFIRMED",
+      "inputDependencyStatus": "SQL_CANDIDATE"
+    }
+  ],
+  "edges": [],
+  "datasetControls": [
+    {
+      "controlId": "dataset-control:110:task:110:statement:0:relation:root.filter:unresolved",
+      "taskId": "110",
+      "statementId": "task:110:slot:query:statement:0",
+      "relationId": "task:110:statement:0:relation:root.filter",
+      "subtype": "FILTER",
+      "masking": false,
+      "grain": "REDUCE",
+      "grainReason": "GRAIN_FILTER_MAY_DROP_ROWS",
+      "field": null,
+      "sourceText": "s.control_key <> 'X'",
+      "evidenceStatus": "UNRESOLVED",
+      "reasonCode": "ROWSET_FIELD_IDENTITY_UNRESOLVED",
+      "evidenceRefs": [
+        "machine-facts:registry/tasks/110/bundle/relation-nodes.jsonl"
+      ]
+    }
+  ],
+  "fieldConditionals": [],
+  "candidates": [],
+  "gaps": [
+    {
+      "gapId": "gap:field-node:110:hive|warehouse|hive_db.root__warehouse|hive_db.root|out_a:output-binding:110:task:110:slot:query:statement:0:0:source_field_schema_unverified:0",
+      "taskId": "110",
+      "nodeId": "field-node:110:hive|warehouse|hive_db.root__warehouse|hive_db.root|out_a:output-binding:110:task:110:slot:query:statement:0:0",
+      "field": null,
+      "reasonCode": "SOURCE_FIELD_SCHEMA_UNVERIFIED",
+      "message": "output expression input is not backed by an exact Table Pack field: {\"binding_status\":\"UNVERIFIED_SCHEMA\",\"column\":\"src_a\",\"field_id\":\"field:hive-warehouse:source.src_a\",\"table\":\"source\"}",
+      "evidenceStatus": "UNRESOLVED",
+      "evidenceRefs": [
+        "machine-facts:registry/tasks/110/bundle/field-expression-nodes.jsonl"
+      ]
+    }
+  ],
+  "tableEdges": [],
+  "limits": {
+    "maxDepth": 8,
+    "maxStates": 100,
+    "maxPaths": 100,
+    "truncated": false,
+    "reasons": []
+  },
+  "boundaries": {
+    "staticSqlOnly": true,
+    "runtimeExecution": "NOT_EVALUATED",
+    "dataCorrectness": "NOT_EVALUATED",
+    "businessAcceptance": "NOT_EVALUATED"
+  },
+  "counts": {
+    "nodes": 1,
+    "edges": 0,
+    "datasetControls": 1,
+    "fieldConditionals": 0,
+    "candidates": 0,
+    "gaps": 1
+  },
+  "contentHash": "31573f93009529c9996ee01980fec6106092edf7c7667efdd452e08205258761"
+}

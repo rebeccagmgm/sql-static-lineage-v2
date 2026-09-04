@@ -1,0 +1,8 @@
+{
+  "taskId": "176827",
+  "outputColumn": "gamma",
+  "minDistinctSourceRelations": 2,
+  "dateColumns": [],
+  "viewTableMarker": "pos_eod_position_view",
+  "expectConfirmedDepthOne": false
+}

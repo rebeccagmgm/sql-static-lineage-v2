@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "field-lineage-baseline-v1",
+  "taskId": "209119",
+  "sourceArtifactPolicy": "reuse-only",
+  "inputPackFingerprint": "fixture-input-pack-209119-sha256",
+  "machineFactsFingerprint": "fixture-machine-facts-209119-sha256",
+  "producerIndexFingerprint": "fixture-producer-index-209119-sha256",
+  "tableMultiHopArtifactFingerprint": "fixture-table-multi-hop-209119-sha256",
+  "expected": {
+    "reusedLayers": [
+      "input-pack",
+      "machine-facts",
+      "producer-index",
+      "table-multi-hop-artifact"
+    ],
+    "recomputedLayers": ["field-lineage", "summary", "html"],
+    "fullTaskCollection": false,
+    "fullProducerIndexRebuild": false
+  },
+  "fieldOnlyCliStatus": "PENDING",
+  "blocker": "The current repository has reconcile-field-lineage but no field-only CLI contract or implementation."
+}

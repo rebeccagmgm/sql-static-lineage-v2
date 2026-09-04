@@ -1,0 +1,26 @@
+[
+  {
+    "controlId": "dataset-control:100:task:100:statement:0:relation:root.filter:hive|warehouse|demo.mid__warehouse|demo.mid|filter_key",
+    "taskId": "100",
+    "statementId": "task:100:slot:query:statement:0",
+    "relationId": "task:100:statement:0:relation:root.filter",
+    "subtype": "FILTER",
+    "masking": false,
+    "grain": "REDUCE",
+    "grainReason": "GRAIN_FILTER_MAY_DROP_ROWS",
+    "field": {
+      "platform": "hive",
+      "dataSource": "warehouse",
+      "stableTableId": "demo.mid__warehouse",
+      "qualifiedName": "demo.mid",
+      "column": "filter_key",
+      "identityStatus": "SCHEMA_BACKED"
+    },
+    "sourceText": "m.filter_key <> 'X'",
+    "evidenceStatus": "PROVISIONAL_LEGACY",
+    "reasonCode": null,
+    "evidenceRefs": [
+      "machine-facts:registry/tasks/100/bundle/relation-nodes.jsonl"
+    ]
+  }
+]

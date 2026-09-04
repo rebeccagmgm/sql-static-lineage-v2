@@ -1,0 +1,48 @@
+/node_modules/
+/dist/
+/coverage/
+/.cache/
+/staging/calcite-differential/
+/staging/audit-*.json
+/tools/calcite-rel-bridge/target/
+/tools/calcite-oracle/target/
+.evidence-cache/
+*.input-pack-status.json
+*.log
+desktop.ini
+
+# Machine-local configuration and state
+/.env
+/.env.*
+!/.env.example
+/config/local.*
+/config/*.local.*
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Local inspection outputs and temporary dependencies
+/tmp/
+/tmp-*
+tmp-inspect-*.ts
+**/corpus-survey-raw.json
+/scripts/survey/
+/tests/survey/
+/tools/audit-corpus-survey*.ts
+/tsconfig.survey.json
+/openspec/changes/generalize-operator-channel-mapping/
+/tests/fixtures/reconcile-one-hop/86840-input-pack/
+
+# Local machine-graph / demo scratch workspaces
+.tmp-*/
+.tmp-machine-graph-demo/
+.tmp-machine-graph-demo-gold-chain/
+
+# Input pipeline scratch
+/scripts/input/tmp/
+
+# Local inspection / query scratch (do not commit)
+/artifacts/
+
+# Editor / IDE local settings
+.vscode/

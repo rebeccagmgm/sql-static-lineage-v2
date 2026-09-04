@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-09-03
+goal: Add opt-in union-v2 continuation candidates while preserving legacy
+  behavior and hashes

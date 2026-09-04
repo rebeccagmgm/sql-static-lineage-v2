@@ -1,0 +1,245 @@
+{
+  "schemaVersion": "1.0.0",
+  "taskId": "86840",
+  "frozenFrom": {
+    "inputPackCollectedAt": "2026-08-21T12:08:27.853Z",
+    "currentTaskContentHash": "7f0d55706bc024806e6df91ff06d5e9d5adfdcc1b8dab0c1ad49fb1bd7fb42a1",
+    "querySha256": "59f1a9a051cafe7b751a6b688a25748a25ecdc2753c0afe75fda23d4a5c199ec",
+    "horaeObservedAt": "2026-08-22T02:58:38.275Z"
+  },
+  "expected": {
+    "sqlDirectReads": 27,
+    "scheduleParents": 26,
+    "matched": 26,
+    "sqlOnly": 1,
+    "scheduleOnly": 0,
+    "unresolved": 0,
+    "sqlOnlyQualifiedName": "pdata_n.ref_dw_cd_val"
+  },
+  "horaeRows": [
+    {
+      "task_id": "102845",
+      "task_name": "odata_n_tit.d_ref_option_deal_pr_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "102846",
+      "task_name": "odata_n_tit.d_ref_option_deal_cr_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "102849",
+      "task_name": "odata_n_tit.d_ref_op_deal_autocall_kodate_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "102851",
+      "task_name": "odata_n_tit.d_ref_op_deal_autocall_kidate_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "102854",
+      "task_name": "odata_n_tit.d_trd_option_deal_settlement_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "102856",
+      "task_name": "odata_n_tit.d_ref_option_deal_strike_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "105007",
+      "task_name": "odata_n_tit.d_ref_future_properties_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "141947",
+      "task_name": "odata_n_ois.g_hk_counterparty_f",
+      "topic_name": "ODATA_N_OIS",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "231306",
+      "task_name": "odata_n_tit.f_ref_option_margin_trs_relation_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "60450",
+      "task_name": "odata_n_ois.o_otc_derivative_counterparty_f",
+      "topic_name": "ODATA_N_OIS",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "71698",
+      "task_name": "odata_n_tit.d_trd_otc_trade_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78346",
+      "task_name": "odata_n_tit.d_ref_ctpty_mapping_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78348",
+      "task_name": "odata_n_tit.d_ref_book_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78349",
+      "task_name": "odata_n_tit.d_ref_instrument_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78350",
+      "task_name": "odata_n_tit.r_cfg_instrument_pool_props_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78471",
+      "task_name": "odata_n_tit.d_ref_option_deal_structure_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78472",
+      "task_name": "odata_n_tit.d_ref_otc_option_deal_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78473",
+      "task_name": "odata_n_tit.d_ref_trs_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78564",
+      "task_name": "odata_n_tit.d_ref_rmb_midrate_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78565",
+      "task_name": "odata_n_tit.d_ref_otc_contr_margin_param_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78569",
+      "task_name": "odata_n_tit.d_trd_daily_accrual_fee_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78574",
+      "task_name": "odata_n_tit.d_margin_plan_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78576",
+      "task_name": "odata_n_tit.d_trd_bundle_info_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "78590",
+      "task_name": "odata_n_tit.d_pos_eod_calc_metrics_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "88267",
+      "task_name": "odata_n_tit.d_ref_basket_constituent_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    },
+    {
+      "task_id": "91256",
+      "task_name": "odata_n_tit.d_trd_otc_contr_props_f",
+      "topic_name": "ODATA_N_TIT",
+      "direction": "上游",
+      "total": 26
+    }
+  ],
+  "supplementalResponses": {
+    "141947": {
+      "taskId": "141947",
+      "target": "odata_n_ois.g_hk_counterparty",
+      "hivePartition": "${YYYY-MM-DD}",
+      "loadMode": null,
+      "evidenceLevel": "opencli_task_source",
+      "status": "SUCCEEDED",
+      "sqlStatus": "AVAILABLE",
+      "observedAt": "2026-08-22T02:59:10.112Z"
+    },
+    "231306": {
+      "taskId": "231306",
+      "target": "odata_n_tit.f_ref_option_margin_trs_relation",
+      "hivePartition": "${YYYY-MM-DD}",
+      "loadMode": null,
+      "evidenceLevel": "opencli_task_source",
+      "status": "SUCCEEDED",
+      "sqlStatus": "AVAILABLE",
+      "observedAt": "2026-08-22T02:59:14.059Z"
+    },
+    "60450": {
+      "taskId": "60450",
+      "target": "odata_n_ois.o_otc_derivative_counterparty",
+      "hivePartition": "${YYYY-MM-DD}",
+      "loadMode": null,
+      "evidenceLevel": "opencli_task_source",
+      "status": "SUCCEEDED",
+      "sqlStatus": "AVAILABLE",
+      "observedAt": "2026-08-22T02:59:18.11Z"
+    },
+    "78350": {
+      "taskId": "78350",
+      "target": "odata_n_tit.r_cfg_instrument_pool_props",
+      "hivePartition": "${YYYY-MM-DD}",
+      "loadMode": null,
+      "evidenceLevel": "opencli_task_source",
+      "status": "SUCCEEDED",
+      "sqlStatus": "AVAILABLE",
+      "observedAt": "2026-08-22T02:59:41.324Z"
+    }
+  }
+}

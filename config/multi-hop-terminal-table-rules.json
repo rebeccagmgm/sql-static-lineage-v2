@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "stopRoles": ["REFERENCE_CONFIG"],
+  "roles": {
+    "REFERENCE_CONFIG": {
+      "qualifiedNameExact": [
+        "temp_n.client_label",
+        "pdata_n.ref_cd_cvt_map",
+        "pdata_n.ref_cd_cvt_map_temp"
+      ],
+      "qualifiedNameTerms": [
+        "tag_def",
+        "label_def",
+        "grp_def",
+        "metric_def",
+        "indicator_def",
+        "_config",
+        "_cfg",
+        "_param",
+        "_dict"
+      ]
+    }
+  }
+}

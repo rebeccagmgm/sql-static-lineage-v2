@@ -1,0 +1,349 @@
+{
+  "occurrences": {
+    "left": {
+      "occurrenceId": "query#0:root.read.l",
+      "readRelationId": "root.read.l",
+      "statementIndex": 0,
+      "relationPath": [
+        "root.read.l"
+      ]
+    },
+    "right": {
+      "occurrenceId": "query#0:root.read.r",
+      "readRelationId": "root.read.r",
+      "statementIndex": 0,
+      "relationPath": [
+        "root.read.r"
+      ]
+    }
+  },
+  "artifact": {
+    "schemaVersion": "1.2.0",
+    "artifactType": "FIELD_MULTI_HOP_RECONCILIATION",
+    "request": {
+      "rootTaskId": "120",
+      "rootTable": "demo.root",
+      "rootWriteObservationIds": [
+        "write-observation:120:platform-target:0"
+      ],
+      "rootFields": [
+        "left_amount",
+        "right_amount"
+      ],
+      "rootFieldSelection": "EXPLICIT",
+      "factsPolicy": "current-only"
+    },
+    "overallStatus": "COMPLETE",
+    "rootNodeIds": [
+      "field-node:120:hive|warehouse|demo.root__warehouse|demo.root|left_amount:output-binding:120:task:120:slot:query:statement:0:0",
+      "field-node:120:hive|warehouse|demo.root__warehouse|demo.root|right_amount:output-binding:120:task:120:slot:query:statement:0:1"
+    ],
+    "nodes": [
+      {
+        "nodeId": "field-node:120:hive|warehouse|demo.root__warehouse|demo.root|left_amount:output-binding:120:task:120:slot:query:statement:0:0",
+        "taskId": "120",
+        "taskName": "demo.root.self-join.task",
+        "depth": 0,
+        "field": {
+          "platform": "hive",
+          "dataSource": "warehouse",
+          "stableTableId": "demo.root__warehouse",
+          "qualifiedName": "demo.root",
+          "column": "left_amount",
+          "identityStatus": "SCHEMA_BACKED"
+        },
+        "bindingId": "output-binding:120:task:120:slot:query:statement:0:0",
+        "expressionId": "task:120:statement:0:relation:root.project:expression:project_expression:0",
+        "expressionText": "l.amount AS left_amount",
+        "evidenceStatus": "CONFIRMED",
+        "inputDependencyStatus": "PHYSICAL"
+      },
+      {
+        "nodeId": "field-node:120:hive|warehouse|demo.root__warehouse|demo.root|right_amount:output-binding:120:task:120:slot:query:statement:0:1",
+        "taskId": "120",
+        "taskName": "demo.root.self-join.task",
+        "depth": 0,
+        "field": {
+          "platform": "hive",
+          "dataSource": "warehouse",
+          "stableTableId": "demo.root__warehouse",
+          "qualifiedName": "demo.root",
+          "column": "right_amount",
+          "identityStatus": "SCHEMA_BACKED"
+        },
+        "bindingId": "output-binding:120:task:120:slot:query:statement:0:1",
+        "expressionId": "task:120:statement:0:relation:root.project:expression:project_expression:1",
+        "expressionText": "r.amount AS right_amount",
+        "evidenceStatus": "CONFIRMED",
+        "inputDependencyStatus": "PHYSICAL"
+      },
+      {
+        "nodeId": "field-node:121:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:121:task:121:slot:query:statement:0:1",
+        "taskId": "121",
+        "taskName": "demo.same.121",
+        "depth": 1,
+        "field": {
+          "platform": "hive",
+          "dataSource": "warehouse",
+          "stableTableId": "demo.same__warehouse",
+          "qualifiedName": "demo.same",
+          "column": "amount",
+          "identityStatus": "SCHEMA_BACKED"
+        },
+        "bindingId": "output-binding:121:task:121:slot:query:statement:0:1",
+        "expressionId": "task:121:statement:0:relation:root.project:expression:project_expression:1",
+        "expressionText": "amount",
+        "evidenceStatus": "CONFIRMED",
+        "inputDependencyStatus": "PHYSICAL"
+      },
+      {
+        "nodeId": "field-node:122:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:122:task:122:slot:query:statement:0:1",
+        "taskId": "122",
+        "taskName": "demo.same.122",
+        "depth": 1,
+        "field": {
+          "platform": "hive",
+          "dataSource": "warehouse",
+          "stableTableId": "demo.same__warehouse",
+          "qualifiedName": "demo.same",
+          "column": "amount",
+          "identityStatus": "SCHEMA_BACKED"
+        },
+        "bindingId": "output-binding:122:task:122:slot:query:statement:0:1",
+        "expressionId": "task:122:statement:0:relation:root.project:expression:project_expression:1",
+        "expressionText": "amount",
+        "evidenceStatus": "CONFIRMED",
+        "inputDependencyStatus": "PHYSICAL"
+      },
+      {
+        "nodeId": "field-source-node:120:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:120:task:120:slot:query:statement:0:0",
+        "taskId": "120",
+        "taskName": "demo.root.self-join.task",
+        "depth": 0,
+        "field": {
+          "platform": "hive",
+          "dataSource": "warehouse",
+          "stableTableId": "demo.same__warehouse",
+          "qualifiedName": "demo.same",
+          "column": "amount",
+          "identityStatus": "SCHEMA_BACKED"
+        },
+        "bindingId": null,
+        "expressionId": null,
+        "expressionText": null,
+        "evidenceStatus": "CONFIRMED"
+      },
+      {
+        "nodeId": "field-source-node:120:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:120:task:120:slot:query:statement:0:1",
+        "taskId": "120",
+        "taskName": "demo.root.self-join.task",
+        "depth": 0,
+        "field": {
+          "platform": "hive",
+          "dataSource": "warehouse",
+          "stableTableId": "demo.same__warehouse",
+          "qualifiedName": "demo.same",
+          "column": "amount",
+          "identityStatus": "SCHEMA_BACKED"
+        },
+        "bindingId": null,
+        "expressionId": null,
+        "expressionText": null,
+        "evidenceStatus": "CONFIRMED"
+      },
+      {
+        "nodeId": "field-source-node:121:hive|warehouse|demo.source__warehouse|demo.source|amount:output-binding:121:task:121:slot:query:statement:0:1",
+        "taskId": "121",
+        "taskName": "demo.same.121",
+        "depth": 1,
+        "field": {
+          "platform": "hive",
+          "dataSource": "warehouse",
+          "stableTableId": "demo.source__warehouse",
+          "qualifiedName": "demo.source",
+          "column": "amount",
+          "identityStatus": "SCHEMA_BACKED"
+        },
+        "bindingId": null,
+        "expressionId": null,
+        "expressionText": null,
+        "evidenceStatus": "CONFIRMED"
+      },
+      {
+        "nodeId": "field-source-node:122:hive|warehouse|demo.source__warehouse|demo.source|amount:output-binding:122:task:122:slot:query:statement:0:1",
+        "taskId": "122",
+        "taskName": "demo.same.122",
+        "depth": 1,
+        "field": {
+          "platform": "hive",
+          "dataSource": "warehouse",
+          "stableTableId": "demo.source__warehouse",
+          "qualifiedName": "demo.source",
+          "column": "amount",
+          "identityStatus": "SCHEMA_BACKED"
+        },
+        "bindingId": null,
+        "expressionId": null,
+        "expressionText": null,
+        "evidenceStatus": "CONFIRMED"
+      }
+    ],
+    "edges": [
+      {
+        "edgeId": "value-edge:field-node:121:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:121:task:121:slot:query:statement:0:1->field-source-node:120:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:120:task:120:slot:query:statement:0:0:cross-task",
+        "fromNodeId": "field-node:121:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:121:task:121:slot:query:statement:0:1",
+        "toNodeId": "field-source-node:120:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:120:task:120:slot:query:statement:0:0",
+        "consumerTaskId": "120",
+        "producerTaskId": "121",
+        "kind": "VALUE_FLOW",
+        "mapping": "demo.same.amount -> demo.same.amount",
+        "evidenceStatus": "CONFIRMED",
+        "evidenceRefs": [
+          "field-lineage:consumer-read:120:query#0:root.read.l:root.read.l",
+          "field-lineage:producer-write:121:write-observation:121:0:output-binding:121:task:121:slot:query:statement:0:1",
+          "machine-facts:registry/tasks/120/bundle/dataset-io.jsonl",
+          "machine-facts:registry/tasks/120/bundle/relation-nodes.jsonl",
+          "machine-facts:registry/tasks/121/bundle/dataset-io.jsonl",
+          "machine-facts:registry/tasks/121/bundle/output-field-bindings.jsonl"
+        ]
+      },
+      {
+        "edgeId": "value-edge:field-node:122:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:122:task:122:slot:query:statement:0:1->field-source-node:120:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:120:task:120:slot:query:statement:0:1:cross-task",
+        "fromNodeId": "field-node:122:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:122:task:122:slot:query:statement:0:1",
+        "toNodeId": "field-source-node:120:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:120:task:120:slot:query:statement:0:1",
+        "consumerTaskId": "120",
+        "producerTaskId": "122",
+        "kind": "VALUE_FLOW",
+        "mapping": "demo.same.amount -> demo.same.amount",
+        "evidenceStatus": "CONFIRMED",
+        "evidenceRefs": [
+          "field-lineage:consumer-read:120:query#0:root.read.r:root.read.r",
+          "field-lineage:producer-write:122:write-observation:122:0:output-binding:122:task:122:slot:query:statement:0:1",
+          "machine-facts:registry/tasks/120/bundle/dataset-io.jsonl",
+          "machine-facts:registry/tasks/120/bundle/relation-nodes.jsonl",
+          "machine-facts:registry/tasks/122/bundle/dataset-io.jsonl",
+          "machine-facts:registry/tasks/122/bundle/output-field-bindings.jsonl"
+        ]
+      },
+      {
+        "edgeId": "value-edge:field-source-node:120:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:120:task:120:slot:query:statement:0:0->field-node:120:hive|warehouse|demo.root__warehouse|demo.root|left_amount:output-binding:120:task:120:slot:query:statement:0:0:task:120:statement:0:relation:root.project:expression:project_expression:0",
+        "fromNodeId": "field-source-node:120:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:120:task:120:slot:query:statement:0:0",
+        "toNodeId": "field-node:120:hive|warehouse|demo.root__warehouse|demo.root|left_amount:output-binding:120:task:120:slot:query:statement:0:0",
+        "consumerTaskId": "120",
+        "producerTaskId": null,
+        "kind": "VALUE_FLOW",
+        "mapping": "amount -> left_amount",
+        "evidenceStatus": "CONFIRMED",
+        "evidenceRefs": [
+          "machine-facts:registry/tasks/120/bundle/field-expression-nodes.jsonl",
+          "machine-facts:registry/tasks/120/bundle/output-field-bindings.jsonl"
+        ]
+      },
+      {
+        "edgeId": "value-edge:field-source-node:120:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:120:task:120:slot:query:statement:0:1->field-node:120:hive|warehouse|demo.root__warehouse|demo.root|right_amount:output-binding:120:task:120:slot:query:statement:0:1:task:120:statement:0:relation:root.project:expression:project_expression:1",
+        "fromNodeId": "field-source-node:120:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:120:task:120:slot:query:statement:0:1",
+        "toNodeId": "field-node:120:hive|warehouse|demo.root__warehouse|demo.root|right_amount:output-binding:120:task:120:slot:query:statement:0:1",
+        "consumerTaskId": "120",
+        "producerTaskId": null,
+        "kind": "VALUE_FLOW",
+        "mapping": "amount -> right_amount",
+        "evidenceStatus": "CONFIRMED",
+        "evidenceRefs": [
+          "machine-facts:registry/tasks/120/bundle/field-expression-nodes.jsonl",
+          "machine-facts:registry/tasks/120/bundle/output-field-bindings.jsonl"
+        ]
+      },
+      {
+        "edgeId": "value-edge:field-source-node:121:hive|warehouse|demo.source__warehouse|demo.source|amount:output-binding:121:task:121:slot:query:statement:0:1->field-node:121:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:121:task:121:slot:query:statement:0:1:task:121:statement:0:relation:root.project:expression:project_expression:1",
+        "fromNodeId": "field-source-node:121:hive|warehouse|demo.source__warehouse|demo.source|amount:output-binding:121:task:121:slot:query:statement:0:1",
+        "toNodeId": "field-node:121:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:121:task:121:slot:query:statement:0:1",
+        "consumerTaskId": "121",
+        "producerTaskId": null,
+        "kind": "VALUE_FLOW",
+        "mapping": "amount -> amount",
+        "evidenceStatus": "CONFIRMED",
+        "evidenceRefs": [
+          "machine-facts:registry/tasks/121/bundle/field-expression-nodes.jsonl",
+          "machine-facts:registry/tasks/121/bundle/output-field-bindings.jsonl"
+        ]
+      },
+      {
+        "edgeId": "value-edge:field-source-node:122:hive|warehouse|demo.source__warehouse|demo.source|amount:output-binding:122:task:122:slot:query:statement:0:1->field-node:122:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:122:task:122:slot:query:statement:0:1:task:122:statement:0:relation:root.project:expression:project_expression:1",
+        "fromNodeId": "field-source-node:122:hive|warehouse|demo.source__warehouse|demo.source|amount:output-binding:122:task:122:slot:query:statement:0:1",
+        "toNodeId": "field-node:122:hive|warehouse|demo.same__warehouse|demo.same|amount:output-binding:122:task:122:slot:query:statement:0:1",
+        "consumerTaskId": "122",
+        "producerTaskId": null,
+        "kind": "VALUE_FLOW",
+        "mapping": "amount -> amount",
+        "evidenceStatus": "CONFIRMED",
+        "evidenceRefs": [
+          "machine-facts:registry/tasks/122/bundle/field-expression-nodes.jsonl",
+          "machine-facts:registry/tasks/122/bundle/output-field-bindings.jsonl"
+        ]
+      }
+    ],
+    "datasetControls": [
+      {
+        "controlId": "dataset-control:120:task:120:statement:0:relation:root.join.1:hive|warehouse|demo.same__warehouse|demo.same|id",
+        "taskId": "120",
+        "statementId": "task:120:slot:query:statement:0",
+        "relationId": "task:120:statement:0:relation:root.join.1",
+        "subtype": "JOIN",
+        "masking": false,
+        "grain": "EXPAND_RISK",
+        "grainReason": "GRAIN_JOIN_CARDINALITY_UNPROVEN",
+        "field": {
+          "platform": "hive",
+          "dataSource": "warehouse",
+          "stableTableId": "demo.same__warehouse",
+          "qualifiedName": "demo.same",
+          "column": "id",
+          "identityStatus": "SCHEMA_BACKED"
+        },
+        "sourceText": "JOIN demo.same r ON l.id = r.id",
+        "evidenceStatus": "CONFIRMED",
+        "reasonCode": null,
+        "evidenceRefs": [
+          "machine-facts:registry/tasks/120/bundle/relation-nodes.jsonl"
+        ]
+      }
+    ],
+    "fieldConditionals": [],
+    "candidates": [],
+    "gaps": [],
+    "tableEdges": [
+      {
+        "consumerTaskId": "120",
+        "producerTaskId": "121",
+        "classification": "PRIMARY"
+      },
+      {
+        "consumerTaskId": "120",
+        "producerTaskId": "122",
+        "classification": "PRIMARY"
+      }
+    ],
+    "limits": {
+      "maxDepth": 4,
+      "maxStates": 100,
+      "maxPaths": 100,
+      "truncated": false,
+      "reasons": []
+    },
+    "boundaries": {
+      "staticSqlOnly": true,
+      "runtimeExecution": "NOT_EVALUATED",
+      "dataCorrectness": "NOT_EVALUATED",
+      "businessAcceptance": "NOT_EVALUATED"
+    },
+    "counts": {
+      "nodes": 8,
+      "edges": 6,
+      "datasetControls": 1,
+      "fieldConditionals": 0,
+      "candidates": 0,
+      "gaps": 0
+    },
+    "contentHash": "3810dfdcc4773f80ae3073c56b6ffdc0ff65f241ea560b050a989bba48768749"
+  }
+}

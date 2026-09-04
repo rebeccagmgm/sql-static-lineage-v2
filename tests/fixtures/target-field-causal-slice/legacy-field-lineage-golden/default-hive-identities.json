@@ -1,0 +1,18 @@
+{
+  "rootNodeFields": [
+    {
+      "platform": "hive",
+      "dataSource": "warehouse",
+      "stableTableId": "hive_db.root__warehouse",
+      "qualifiedName": "hive_db.root",
+      "column": "out_a",
+      "identityStatus": "SCHEMA_BACKED"
+    }
+  ],
+  "datasetControlFields": [
+    null
+  ],
+  "datasetControlReasonCodes": [
+    "ROWSET_FIELD_IDENTITY_UNRESOLVED"
+  ]
+}

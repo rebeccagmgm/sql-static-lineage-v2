@@ -1,0 +1,6 @@
+{
+  "taskId": "176827",
+  "joinRelationMarker": "setop.b0.join.5",
+  "nullableSideColumn": "gamma_pct",
+  "preservedSideColumn": "nom"
+}

@@ -1,0 +1,18 @@
+tmp/
+staging/
+.evidence-cache/
+node_modules/
+dist/
+
+# Local scratch workspaces (mirror .gitignore)
+.tmp-*/
+.tmp-machine-graph-demo/
+.tmp-machine-graph-demo-gold-chain/
+scripts/input/tmp/
+
+# Large local artifacts
+artifacts/demo/
+artifacts/gold-case-dm-rsk-n/project-graph/
+artifacts/gold-case-dm-rsk-n/_mem-probe/
+artifacts/gold-case-dm-rsk-n/gold-case-gaps.jsonl
+artifacts/gold-case-dm-rsk-n/gold-case-trace-report.json
